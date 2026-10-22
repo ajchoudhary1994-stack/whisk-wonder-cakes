@@ -2797,13 +2797,31 @@ document.addEventListener('DOMContentLoaded', function () {
       }).then(function () { btn.disabled = false; fillSummary(); });
   }
   function useLocationForDelivery() {
-    if (!navigator.geolocation) { setDelMsg('Your browser does not support location. Please use the address button.', false); return; }
-    setDelMsg('Getting your location…', true);
-    navigator.geolocation.getCurrentPosition(function (pos) {
-      quoteFrom(pos.coords.latitude, pos.coords.longitude); showQuote(); fillSummary();
-    }, function () {
-      setDelMsg('Could not get your location (permission blocked?). Please use the address button instead.', false);
-    }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 });
+    if (!window.isSecureContext || !navigator.geolocation) {
+      setDelMsg('This browser cannot share your location. Please type your address and tap “Calculate delivery charge”.', false);
+      return;
+    }
+    setDelMsg('Getting your location… Allow the location popup, and keep your phone’s GPS / Location turned on.', true);
+    var ok = function (pos) { quoteFrom(pos.coords.latitude, pos.coords.longitude); showQuote(); fillSummary(); };
+    var fail = function (err, retried) {
+      /* code 3 = timeout: GPS was slow, try once more with a quicker, less exact fix */
+      if (err && err.code === 3 && !retried) {
+        navigator.geolocation.getCurrentPosition(ok, function (e2) { fail(e2, true); },
+          { enableHighAccuracy: false, timeout: 20000, maximumAge: 300000 });
+        return;
+      }
+      var why;
+      if (err && err.code === 1) {
+        why = 'Location permission is blocked. Allow location for this site in your browser settings. If you opened this link inside WhatsApp or Instagram, open it in Chrome instead.';
+      } else if (err && err.code === 2) {
+        why = 'Your phone could not find its location. Turn on GPS / Location in phone settings and try again.';
+      } else {
+        why = 'Finding your location took too long. Turn on GPS and try again.';
+      }
+      setDelMsg(why + ' You can also type your address and tap “Calculate delivery charge”.', false);
+    };
+    navigator.geolocation.getCurrentPosition(ok, function (e) { fail(e, false); },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 });
   }
 
   /* Reward codes are checked on the server (netlify/functions/rewards.js) */
