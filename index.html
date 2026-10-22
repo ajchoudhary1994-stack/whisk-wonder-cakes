@@ -1411,7 +1411,7 @@ section{position:relative;}
             <input type="text" id="hdArea" placeholder="Village, area or PIN code (e.g. Palampur 176061)" autocomplete="off" enterkeyhint="search">
             <button type="button" class="btn btn-gold" id="hdCheckBtn">Check</button>
           </div>
-          <button type="button" class="hd-loc" id="hdLocBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="7.5" stroke="currentColor" stroke-width="1.6"/></svg>Use my current location</button>
+          
           <div class="hd-result" id="hdResult" role="status" aria-live="polite"></div>
           <p class="hd-note">Distance is measured in a straight line from our kitchen in Arla, the same way as our 10 km radius. Your location is only used to calculate the distance and is never stored. Delivery: ₹20 for the first 1 km, then ₹10 more for every extra km (5 km = ₹60, 10 km = ₹110). Beyond 10 km, we confirm the charge with you on WhatsApp. Pickup is free.</p>
         </div>
@@ -1823,9 +1823,7 @@ section{position:relative;}
         <select id="coMode"><option value="delivery">Home delivery</option><option value="pickup">Pickup from our kitchen, Arla</option></select></div>
       <div id="coAddrWrap"><label for="coAddr">Delivery address</label><textarea id="coAddr" autocomplete="street-address" placeholder="House no., village / area, landmark"></textarea></div>
       <div id="coDelWrap" style="display:flex;flex-direction:column;gap:.45rem">
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn btn-dark" type="button" id="coCalcDel" style="flex:1;min-width:150px">Calculate delivery charge</button><button class="btn btn-dark" type="button" id="coLocDel" style="flex:1;min-width:150px">Use my current location</button></div>
-        <p id="coDelMsg" class="sum-note" style="margin:0"></p>
-        <p class="sum-note" style="margin:0">Delivery: ₹20 for the first 1 km, then ₹10 more for every extra km (5 km = ₹60, 10 km = ₹110). Beyond 10 km, we confirm the charge with you on WhatsApp. Pickup is free.</p>
+        <p class="sum-note" style="margin:0">Delivery: ₹20 for the first 1 km, then ₹10 more for every extra km (5 km = ₹60, 10 km = ₹110). Beyond 10 km we confirm with you on WhatsApp. Pickup is free. We confirm the exact charge with you on WhatsApp after you order.</p>
       </div>
       <div class="co-row">
         <div><label for="coDate">Date</label><input id="coDate" type="date" required></div>
@@ -1836,7 +1834,7 @@ section{position:relative;}
       <div><label for="coCode">Reward code (optional)</label><input id="coCode" type="text" placeholder="RWD-XXXXXX" autocomplete="off"><p id="coCodeMsg" class="sum-note" style="margin:.35rem 0 0"></p></div>
       <div class="co-title">Payment</div>
             <label class="pay-opt" id="payUpiOpt" hidden><input type="radio" name="pay" value="upi" checked><span><strong>Pay by UPI (PhonePe, GPay, Paytm…)</strong><small id="payUpiSub">Opens your UPI app with the amount filled in, or scan our QR code.</small></span></label>
-      <label class="pay-opt"><input type="radio" name="pay" value="cod"><span><strong id="payCodTitle">Pay on delivery / pickup</strong><small id="payCodSub">Cash or UPI when you receive the cake</small></span></label>
+      <label class="pay-opt" id="payCodOpt"><input type="radio" name="pay" value="cod"><span><strong id="payCodTitle">Pay on delivery / pickup</strong><small id="payCodSub">Pay 50% now by UPI, the rest on delivery or pickup</small></span></label>
       <div class="co-err" id="coErr" role="alert"></div>
       <button class="btn btn-gold" id="coPlace" type="submit">Place Order</button>
     </form>
@@ -2761,68 +2759,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* ---------- checkout ---------- */
   function coErr(msg) { var e = $('coErr'); e.textContent = msg || ''; e.classList.toggle('show', !!msg); if (msg) { e.scrollIntoView({ block: 'center', behavior: 'smooth' }); } }
-  /* ---------- delivery charge by distance ---------- */
-  /* ₹20 for the first km, then +₹10 for each extra km (distance rounded up).
-     1 km ₹20 · 2 km ₹30 · 5 km ₹60 · 6 km ₹70 · 10 km ₹110. Pickup is free. */
-  var deliveryQuote = null;   /* {km, charge} or {outside:true, km} */
-  function chargeFor(km) { var k = Math.max(1, Math.ceil(km)); return 20 + 10 * (k - 1); }
-  function quoteFrom(lat, lon) {
-    var d = haversine(KITCHEN.lat, KITCHEN.lon, lat, lon);
-    deliveryQuote = d > RADIUS_KM ? { outside: true, km: d } : { km: d, charge: chargeFor(d) };
-  }
-  function deliveryPending() { return $('coMode').value === 'delivery' && !!(deliveryQuote && deliveryQuote.outside); }
-  function deliveryAmt() { return ($('coMode').value === 'delivery' && deliveryQuote && deliveryQuote.charge) ? deliveryQuote.charge : 0; }
-  function setDelMsg(msg, ok) { var el = $('coDelMsg'); el.textContent = msg; el.style.color = ok ? '#2f6b3a' : '#b23b3b'; }
-  function showQuote() {
-    if (!deliveryQuote) { setDelMsg('', true); return; }
-    if (deliveryQuote.outside) {
-      setDelMsg('This address is about ' + deliveryQuote.km.toFixed(1) + ' km away. Your order can still be placed. We will confirm the delivery charge with you on WhatsApp before we deliver.', true);
-    } else {
-      setDelMsg('Delivery charge: ₹' + deliveryQuote.charge + ' (about ' + deliveryQuote.km.toFixed(1) + ' km from our kitchen)', true);
-    }
-  }
-  function geocodeAddress() {
-    var q = $('coAddr').value.trim();
-    if (q.length < 8) { setDelMsg('Please type your full address (village, town, PIN code) first.', false); return; }
-    var btn = $('coCalcDel'); btn.disabled = true; setDelMsg('Calculating…', true);
-    var query = /himachal|kangra|palampur|\bhp\b/i.test(q) ? q : q + ', Himachal Pradesh';
-    var url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=in&viewbox=75.9,32.6,77.1,31.6&q=' + encodeURIComponent(query);
-    fetch(url, { headers: { Accept: 'application/json' } }).then(function (r) { if (!r.ok) { throw new Error('geo'); } return r.json(); })
-      .then(function (res) {
-        if (!res.length) { deliveryQuote = null; setDelMsg('We could not find that address on the map. Add the village, nearest town and PIN code, or use “Use my current location”.', false); return; }
-        quoteFrom(parseFloat(res[0].lat), parseFloat(res[0].lon));
-        showQuote();
-      }).catch(function () {
-        deliveryQuote = null; setDelMsg('Address lookup is not working right now. Please try “Use my current location”.', false);
-      }).then(function () { btn.disabled = false; fillSummary(); });
-  }
-  function useLocationForDelivery() {
-    if (!window.isSecureContext || !navigator.geolocation) {
-      setDelMsg('This browser cannot share your location. Please type your address and tap “Calculate delivery charge”.', false);
-      return;
-    }
-    setDelMsg('Getting your location… Allow the location popup, and keep your phone’s GPS / Location turned on.', true);
-    var ok = function (pos) { quoteFrom(pos.coords.latitude, pos.coords.longitude); showQuote(); fillSummary(); };
-    var fail = function (err, retried) {
-      /* code 3 = timeout: GPS was slow, try once more with a quicker, less exact fix */
-      if (err && err.code === 3 && !retried) {
-        navigator.geolocation.getCurrentPosition(ok, function (e2) { fail(e2, true); },
-          { enableHighAccuracy: false, timeout: 20000, maximumAge: 300000 });
-        return;
-      }
-      var why;
-      if (err && err.code === 1) {
-        why = 'Location permission is blocked. Allow location for this site in your browser settings. If you opened this link inside WhatsApp or Instagram, open it in Chrome instead.';
-      } else if (err && err.code === 2) {
-        why = 'Your phone could not find its location. Turn on GPS / Location in phone settings and try again.';
-      } else {
-        why = 'Finding your location took too long. Turn on GPS and try again.';
-      }
-      setDelMsg(why + ' You can also type your address and tap “Calculate delivery charge”.', false);
-    };
-    navigator.geolocation.getCurrentPosition(ok, function (e) { fail(e, false); },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 });
-  }
+  /* ---------- delivery: simple rule, charge confirmed on WhatsApp ---------- */
+  /* Charge is not calculated on the site. The owner checks the address and confirms the exact
+     charge on WhatsApp (₹20 for the first 1 km, then ₹10 per extra km, beyond 10 km by agreement). */
+  function deliveryPending() { return $('coMode').value === 'delivery'; }
+  function deliveryAmt() { return 0; }
 
   /* Reward codes are checked on the server (netlify/functions/rewards.js) */
   var appliedReward = null;  /* {code, amount} once the server confirms the code */
@@ -2856,7 +2797,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!upiOk) { document.querySelector('input[name="pay"][value="cod"]').checked = true; }
     else if (!cur || cur.closest('label').hidden) { document.querySelector('input[name="pay"][value="upi"]').checked = true; }
     $('payUpiSub').textContent = x ? 'Pay for your cakes now. Bundles and party items are confirmed on WhatsApp.' : 'Opens your UPI app with the amount filled in, or scan our QR code.';
-    $('payCodSub').textContent = (t - disc + dlv) > 0 ? 'Cash or UPI when you receive your order' : 'No payment now. We confirm everything on WhatsApp.';
+    $('payCodSub').textContent = (t - disc + dlv) > 0 ? 'Pay 50% now by UPI, the rest on delivery or pickup' : 'No payment now. We confirm everything on WhatsApp.';
   }
   function itemsText() { return cart.map(function (l) { return lineLabel(l) + ' x' + l.qty; }).join(', '); }
   function newOrderId() { return makeCode('ORD'); }
@@ -2877,8 +2818,7 @@ document.addEventListener('DOMContentLoaded', function () {
     o.lines.forEach(function (l) { L.push('• ' + l.label + ' × ' + l.qty + (l.amount > 0 ? ' = ' + rupee(l.amount) : ' (no payment now, details on WhatsApp)')); });
     var cakesOnly = o.total - (o.delivery || 0);
     L.push('', '💰 Cakes total: ' + (cakesOnly ? rupee(cakesOnly) : 'none') + (o.extras ? ' (bundles / party items: confirmed on WhatsApp, delivered with the cake)' : ''));
-    if (o.delivery) L.push('🚚 Delivery (about ' + o.deliveryKm.toFixed(1) + ' km): ' + rupee(o.delivery));
-    if (o.deliveryPending) L.push('🚚 Delivery (about ' + o.deliveryKm.toFixed(1) + ' km, beyond 10 km): charge to be confirmed with customer on WhatsApp');
+    if (o.deliveryPending) L.push('🚚 Delivery (home delivery): charge to be confirmed with customer on WhatsApp');
     L.push('💳 Total payable: ' + rupee(o.total), '💳 Payment: ' + payLine);
     if (o.discount) L.push('🏷️ Reward ' + o.f.code + ': -' + rupee(o.discount) + ' (cakes total above is after discount)');
     if (o.f.msg) L.push('🎂 Message on cake: ' + o.f.msg);
@@ -2906,15 +2846,17 @@ document.addEventListener('DOMContentLoaded', function () {
     $('doneId').textContent = o.id;
     $('doneWa').href = 'https://wa.me/' + OWNER_WA + '?text=' + enc;
     $('doneWaAlt').href = 'https://wa.me/' + ALT_WA + '?text=' + enc;
-    $('doneTitle').textContent = isUpi ? 'Order placed! Now pay by UPI' : 'Order placed!';
+    $('doneTitle').textContent = isUpi ? (o.balance > 0 ? 'Order placed! Pay 50% now by UPI' : 'Order placed! Now pay by UPI') : 'Order placed!';
     $('doneText').textContent = (isUpi
-      ? 'Pay for your cakes with the button or QR code below, then send your order and the payment screenshot on WhatsApp. Your order is confirmed once we see the payment.'
+      ? (o.balance > 0
+        ? 'Pay the 50% advance now with the button or QR code below, then send your order and the payment screenshot on WhatsApp. The remaining 50% is paid on delivery or pickup. Your order is confirmed once we see the advance payment.'
+        : 'Pay for your cakes with the button or QR code below, then send your order and the payment screenshot on WhatsApp. Your order is confirmed once we see the payment.')
       : 'Tap the button below to send your order on WhatsApp. We will confirm the timing and delivery there.') + (o.extras ? ' ' + EXTRAS_NOTE : '') + ' Once we confirm your payment, we will WhatsApp you a link to share feedback and get your reward code.';
     var panel = $('upiPanel'); panel.hidden = !isUpi;
     if (isUpi) {
-      $('upiAmt').textContent = rupee(o.total);
-      $('upiAmtNote').textContent = o.extras ? 'This is for your cakes only. Bundles and party supplies are confirmed on WhatsApp.' : '';
-      $('upiPayBtn').href = 'upi://pay?pa=' + encodeURIComponent(UPI_ID) + '&pn=' + encodeURIComponent(UPI_NAME) + '&tn=' + encodeURIComponent('Order ' + o.id) + '&am=' + o.total + '&cu=INR';
+      $('upiAmt').textContent = rupee(o.advance);
+      $('upiAmtNote').textContent = (o.balance > 0 ? 'Balance ' + rupee(o.balance) + ' on delivery / pickup.' : '') + (o.extras ? ' Bundles and party supplies are confirmed on WhatsApp.' : '');
+      $('upiPayBtn').href = 'upi://pay?pa=' + encodeURIComponent(UPI_ID) + '&pn=' + encodeURIComponent(UPI_NAME) + '&tn=' + encodeURIComponent('Order ' + o.id) + '&am=' + o.advance + '&cu=INR';
     }
     cart = []; appliedReward = null; $('coCodeMsg').textContent = ''; save(); renderCart(); view('viewDone');
   }
@@ -2927,12 +2869,9 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!/^[0-9+\s-]{10,15}$/.test(f.phone)) { coErr('Please enter a valid phone number.'); return; }
     if (f.mode === 'delivery' && f.addr.length < 8) { coErr('Please enter your full delivery address.'); return; }
     if (!f.date) { coErr('Please choose a delivery / pickup date.'); return; }
-    if (f.mode === 'delivery') {
-      if (!deliveryQuote) { coErr('Please tap “Calculate delivery charge” (or “Use my current location”) before placing the order.'); return; }
-    }
     var cakes = cart.filter(function (l) { return !isQuote(l); }), extras = cart.filter(isQuote);
     var o = {
-      id: newOrderId(), f: f, total: total(), discount: 0, delivery: deliveryAmt(), deliveryPending: deliveryPending(), deliveryKm: (deliveryQuote && deliveryQuote.km) || 0, extras: extras.length > 0,
+      id: newOrderId(), f: f, total: total(), discount: 0, delivery: 0, deliveryPending: deliveryPending(), deliveryKm: 0, extras: extras.length > 0,
       cakesText: cakes.map(function (l) { return lineLabel(l) + ' x' + l.qty; }).join(', '),
       extrasText: extras.map(function (l) { return lineLabel(l) + ' x' + l.qty; }).join(', '),
       lines: cart.map(function (l) { return { label: lineLabel(l), qty: l.qty, amount: priceOf(l) * l.qty }; })
@@ -2955,13 +2894,30 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   function placeOrder(o, f) {
     o.total = o.total + o.delivery;   /* cakes (after reward) + delivery */
-    var payLine = (f.pay === 'upi' && o.total > 0 && UPI_ID) ? 'UPI (customer will send payment screenshot)' : 'Pay on delivery / pickup';
+    var canUpi = o.total > 0 && !!UPI_ID;
+    var payLine, status;
+    if (canUpi && f.pay === 'cod') {
+      /* Pay on delivery / pickup option: 50% now by UPI, 50% on delivery or pickup */
+      o.advance = Math.ceil(o.total / 2);
+      o.balance = o.total - o.advance;
+      payLine = '50% advance by UPI now: ' + rupee(o.advance) + ', balance ' + rupee(o.balance) + ' on delivery / pickup';
+      status = 'UPI PENDING';
+    } else if (canUpi) {
+      /* UPI option: full payment now */
+      o.advance = o.total;
+      o.balance = 0;
+      payLine = 'Full payment by UPI now: ' + rupee(o.total);
+      status = 'UPI PENDING';
+    } else {
+      o.advance = 0; o.balance = o.total;
+      payLine = 'Pay on delivery / pickup';
+      status = 'COD';
+    }
     rewardApi('createOrder', {
-      orderId: o.id, name: f.name, phone: f.phone, total: o.total, discount: o.discount,
+      orderId: o.id, name: f.name, phone: f.phone, email: f.email, total: o.total, discount: o.discount,
       cakes: o.cakesText, extras: o.extrasText, date: f.date, payment: payLine
     }).catch(function () {});
-    if (payLine.indexOf('UPI') === 0) { finish(o, payLine, 'UPI PENDING'); }
-    else { finish(o, payLine, 'COD'); }
+    finish(o, payLine, status);
   }
 
   /* ---------- delivery check ---------- */
@@ -2976,23 +2932,34 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   function showResult(lat, lon, label) {
     var d = haversine(KITCHEN.lat, KITCHEN.lon, lat, lon), dTxt = d < 10 ? d.toFixed(1) : Math.round(d);
-    var state = d <= RADIUS_KM ? 'ok' : (d <= RADIUS_KM + 3 ? 'maybe' : 'no');
-    var title = state === 'ok' ? 'Yes, we deliver to you!' : state === 'maybe' ? 'Just outside our radius' : 'Sorry, that’s outside our delivery area';
-    var body = state === 'ok' ? 'You are about ' + dTxt + ' km from our kitchen in Arla, inside our ' + RADIUS_KM + ' km home-delivery radius.'
-      : state === 'maybe' ? 'You are about ' + dTxt + ' km away. That is a little beyond ' + RADIUS_KM + ' km — message us and we will tell you if we can still make it.'
-      : 'You are about ' + dTxt + ' km from our kitchen, beyond our ' + RADIUS_KM + ' km radius. You can still order for pickup, or ask us on WhatsApp.';
-    var msg = 'Hi Whisk & Wonder, delivery check: ' + label + ' is about ' + dTxt + ' km from your kitchen. Can you deliver there?';
-    var acts = (state === 'ok' ? '<a class="btn btn-gold" href="#shop">Order Now</a>' : '') +
-      '<a class="btn ' + (state === 'ok' ? 'btn-dark' : 'btn-gold') + ' js-contact" data-contact="wa" data-msg="' + esc(msg) + '" href="https://wa.me/' + OWNER_WA + '">' + (state === 'ok' ? 'Confirm on WhatsApp' : 'Ask on WhatsApp') + '</a>';
-    var pad = 0.025, w = Math.min(lon, KITCHEN.lon) - pad, e = Math.max(lon, KITCHEN.lon) + pad, s = Math.min(lat, KITCHEN.lat) - pad, n = Math.max(lat, KITCHEN.lat) + pad;
-    var map = 'https://www.openstreetmap.org/export/embed.html?bbox=' + [w, s, e, n].join('%2C') + '&layer=mapnik&marker=' + lat + '%2C' + lon;
+    var inside = d <= RADIUS_KM;
+    var title = inside ? 'Yes, we deliver to you!' : 'Outside our 10 km radius, but you can still order';
+    var body = inside
+      ? 'You are about ' + dTxt + ' km from our kitchen in Arla (straight-line), inside our ' + RADIUS_KM + ' km home-delivery radius. Delivery charge: ₹20 for the first 1 km, then ₹10 for each extra km. We confirm the final charge on WhatsApp.'
+      : 'You are about ' + dTxt + ' km from our kitchen (straight-line). Your order can still be placed. We will confirm the delivery charge with you on WhatsApp.';
+    var msg = 'Hi Whisk & Wonder, delivery check: ' + label + ' is about ' + dTxt + ' km from your kitchen. Please confirm delivery.';
+    var mapLink = 'https://www.google.com/maps/search/?api=1&query=' + lat + ',' + lon;
+    var acts = '<a class="btn btn-gold" href="#shop">Order Now</a>' +
+      '<a class="btn btn-dark js-contact" data-contact="wa" data-msg="' + esc(msg) + '" href="https://wa.me/' + OWNER_WA + '">Confirm on WhatsApp</a>';
+    var state = inside ? 'ok' : 'maybe';
     var r = $('hdResult'); r.className = 'hd-result show ' + state;
     r.innerHTML = '<h4>' + title + '</h4><p>' + esc(body) + '</p><p class="hd-place">Checked for: ' + esc(label) + '. Not the right place? Add your village and nearest town or PIN code.</p>' +
-      '<div class="hd-acts">' + acts + '</div><iframe loading="lazy" title="Your location on the map" src="' + map + '"></iframe>';
+      '<div class="hd-acts">' + acts + '</div><p class="hd-place"><a href="' + mapLink + '" target="_blank" rel="noopener">View your location on the map</a></p>';
+  }
+  /* Arla is our home area: always inside the delivery radius, no map lookup needed */
+  function showLocalResult(label) {
+    var r = $('hdResult'); r.className = 'hd-result show ok';
+    var msg = 'Hi Whisk & Wonder, delivery check: ' + label + ' (Arla area). Please confirm delivery.';
+    r.innerHTML = '<h4>Yes, we deliver to you!</h4>' +
+      '<p>' + esc('Arla is our home area, inside our ' + RADIUS_KM + ' km home-delivery radius. Delivery charge: ₹20 for the first 1 km, then ₹10 for each extra km. We confirm the exact charge with you on WhatsApp.') + '</p>' +
+      '<p class="hd-place">Checked for: ' + esc(label) + '.</p>' +
+      '<div class="hd-acts"><a class="btn btn-gold" href="#shop">Order Now</a>' +
+      '<a class="btn btn-dark js-contact" data-contact="wa" data-msg="' + esc(msg) + '" href="https://wa.me/' + OWNER_WA + '">Confirm on WhatsApp</a></div>';
   }
   function checkArea() {
     var q = $('hdArea').value.trim();
     if (q.length < 3) { $('hdArea').focus(); $('hdArea').style.borderColor = '#b23b3b'; return; }
+    if (/\barla/i.test(q)) { showLocalResult(q); return; }
     var btn = $('hdCheckBtn'); btn.disabled = true; btn.firstChild.nodeValue = 'Checking…';
     var query = /himachal|kangra|palampur|\bhp\b/i.test(q) ? q : q + ', Himachal Pradesh';
     var url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=in&viewbox=75.9,32.6,77.1,31.6&q=' + encodeURIComponent(query);
@@ -3005,14 +2972,6 @@ document.addEventListener('DOMContentLoaded', function () {
       }).catch(function () { showErr('The map lookup is not working right now. Please use “Use my current location” or ask us on WhatsApp.'); })
       .then(function () { btn.disabled = false; btn.firstChild.nodeValue = 'Check'; });
   }
-  function useMyLocation() {
-    if (!navigator.geolocation) { showErr('Your browser does not support location. Please type your village or PIN code instead.'); return; }
-    var b = $('hdLocBtn'); b.disabled = true;
-    navigator.geolocation.getCurrentPosition(function (pos) { b.disabled = false; showResult(pos.coords.latitude, pos.coords.longitude, 'your current location'); },
-      function () { b.disabled = false; showErr('We could not get your location (permission may be blocked). Please type your village or PIN code instead.'); },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 });
-  }
-
   /* ---------- wire up ---------- */
   function rerender() { renderShop(); renderParty(); renderBundles(); renderCart(); }
 
@@ -3113,14 +3072,8 @@ document.addEventListener('DOMContentLoaded', function () {
       var pick = this.value === 'pickup';
       $('coAddrWrap').style.display = pick ? 'none' : '';
       $('coDelWrap').style.display = pick ? 'none' : '';
-      if (pick) { deliveryQuote = null; setDelMsg('', true); }
       fillSummary();
     });
-    $('coAddr').addEventListener('input', function () {
-      if (deliveryQuote) { deliveryQuote = null; setDelMsg('Address changed. Please tap “Calculate delivery charge” again.', false); fillSummary(); }
-    });
-    $('coCalcDel').addEventListener('click', geocodeAddress);
-    $('coLocDel').addEventListener('click', useLocationForDelivery);
     $('cartLines').addEventListener('click', function (e) {
       if (e.target.closest('#emptyShop')) { closeCart(); return; }
       var b = e.target.closest('[data-act]'); if (!b) return;
@@ -3148,7 +3101,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     /* delivery check */
     $('hdCheckBtn').addEventListener('click', checkArea);
-    $('hdLocBtn').addEventListener('click', useMyLocation);
     $('hdArea').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); checkArea(); } });
     $('hdArea').addEventListener('input', function () { this.style.borderColor = ''; });
 
