@@ -56,6 +56,73 @@ function tokenOk(kind, id, token) {
 const confirmUrl = (id) => `${SITE}/.netlify/functions/rewards?action=confirm&id=${id}&s=${sign("confirm", id)}`;
 const feedbackUrl = (id) => `${SITE}/?feedback=${id}&t=${sign("feedback", id)}`;
 
+async function sendEmail(to, name, subject, html) {
+  if (!to || !process.env.BREVO_API_KEY || !process.env.BREVO_SENDER_EMAIL) return;
+  try {
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: { "api-key": process.env.BREVO_API_KEY, "Content-Type": "application/json", accept: "application/json" },
+      body: JSON.stringify({
+        sender: { email: process.env.BREVO_SENDER_EMAIL, name: "Whisk & Wonder Cakes" },
+        to: [{ email: to, name: name || "" }],
+        subject,
+        htmlContent: html,
+      }),
+    });
+    if (!res.ok) console.log("BREVO ERROR", res.status, await res.text());
+    else console.log("BREVO OK", subject, "->", to);
+  } catch (e) { console.log("BREVO EXCEPTION", e && e.message); }
+}
+
+function ownerOrderEmail(order) {
+  return `<div style="font-family:Arial,sans-serif;color:#3b2a24;line-height:1.5">
+<h2 style="margin:0 0 .4rem">New order ${esc(order.id)}</h2>
+<ul>
+<li><b>Name:</b> ${esc(order.name)}</li>
+<li><b>Phone:</b> ${esc(order.phone)}</li>
+<li><b>Email:</b> ${esc(order.email || "-")}</li>
+<li><b>Cakes:</b> ${esc(order.cakes || "-")}</li>
+<li><b>Bundles / party:</b> ${esc(order.extras || "-")}</li>
+<li><b>Date:</b> ${esc(order.date || "-")}</li>
+<li><b>Total:</b> Rs ${esc(order.total)}${order.discount ? " (reward Rs " + esc(order.discount) + " applied)" : ""}</li>
+<li><b>Payment:</b> ${esc(order.payment || "-")}</li>
+</ul>
+<p><a href="${confirmUrl(order.id)}" style="display:inline-block;background:#c9a441;color:#2a1d18;padding:.7rem 1rem;border-radius:999px;text-decoration:none;font-weight:600">Confirm payment and send feedback link</a></p>
+</div>`;
+}
+
+function orderReceivedEmail(order) {
+  const half = /50%/.test(order.payment || "");
+  const advance = half ? Math.ceil(order.total / 2) : order.total;
+  const balance = order.total - advance;
+  return `<div style="font-family:Arial,sans-serif;color:#3b2a24;line-height:1.5">
+<h2 style="margin:0 0 .4rem">Thank you, ${esc(order.name)}!</h2>
+<p>We have received your order <b>${esc(order.id)}</b> from Whisk &amp; Wonder Cakes.</p>
+<ul>
+<li><b>Cakes:</b> ${esc(order.cakes || "-")}</li>
+${order.extras ? `<li><b>Bundles / party items:</b> ${esc(order.extras)} (confirmed on WhatsApp)</li>` : ""}
+<li><b>Date:</b> ${esc(order.date || "-")}</li>
+<li><b>Total:</b> Rs ${esc(order.total)}${order.discount ? " (reward Rs " + esc(order.discount) + " applied)" : ""}</li>
+</ul>
+${half
+  ? `<p><b>Payment:</b> Please pay the 50% advance of <b>Rs ${advance}</b> by UPI now, and send the payment screenshot with your order ID on WhatsApp. The remaining <b>Rs ${balance}</b> is paid on delivery or pickup.</p>
+<p>Your order is confirmed once we see the advance payment.</p>`
+  : `<p><b>Payment:</b> Please pay <b>Rs ${advance}</b> by UPI, and send the payment screenshot with your order ID on WhatsApp.</p>
+<p>Your order is confirmed once we see the payment.</p>`}
+<p>Dhanyavaad,<br>Whisk &amp; Wonder Cakes</p>
+</div>`;
+}
+
+function paymentConfirmedEmail(order) {
+  const balance = /50%/.test(order.payment || "") ? order.total - Math.ceil(order.total / 2) : 0;
+  return `<div style="font-family:Arial,sans-serif;color:#3b2a24;line-height:1.5">
+<h2 style="margin:0 0 .4rem">Payment received, ${esc(order.name)}</h2>
+<p>Your order <b>${esc(order.id)}</b> is confirmed. We will be in touch on WhatsApp about delivery or pickup.</p>
+${balance > 0 ? `<p>The remaining <b>Rs ${balance}</b> is paid on delivery or pickup.</p>` : ""}
+<p>Dhanyavaad,<br>Whisk &amp; Wonder Cakes</p>
+</div>`;
+}
+
 async function notifyOwner(order) {
   if (!process.env.NTFY_TOPIC) return;
   try {
@@ -94,13 +161,15 @@ exports.handler = async (event) => {
       if (!ORDER_RE.test(id) || !phone) return json(400, { ok: false, message: "Invalid order" });
       if (await db.get("order:" + id, { type: "json" })) return json(200, { ok: true });
       const order = {
-        id, status: "pending", name: clean(b.name, 60), phone,
+        id, status: "pending", name: clean(b.name, 60), email: clean(b.email, 120), phone,
         total: Math.max(0, Number(b.total) || 0), discount: Math.max(0, Number(b.discount) || 0),
         cakes: clean(b.cakes, 300), extras: clean(b.extras, 300), date: clean(b.date, 20),
         payment: clean(b.payment, 80), createdAt: now(),
       };
       await db.setJSON("order:" + id, order);
       await notifyOwner(order);
+      await sendEmail(process.env.OWNER_EMAIL, "Owner", "New order " + id + " from " + order.name, ownerOrderEmail(order));
+      await sendEmail(order.email, order.name, "Order " + id + " received", orderReceivedEmail(order));
       return json(200, { ok: true });
     }
 
@@ -189,6 +258,7 @@ async function confirmPage(q) {
     order.paidAt = now();
     await db.setJSON("order:" + id, order);
     justConfirmed = true;
+    await sendEmail(order.email, order.name, "Payment received for order " + id, paymentConfirmedEmail(order));
   }
 
   const msg = `Hi ${order.name || ""}, thank you for your order ${id} from Whisk & Wonder Cakes! Your payment is confirmed. Please share your celebration feedback here (takes 1 minute) and get a reward code for your next order: ${feedbackUrl(id)}`;
