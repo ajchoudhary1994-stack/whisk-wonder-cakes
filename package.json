@@ -1,0 +1,7 @@
+{
+  "name": "whisk-and-wonder-site",
+  "private": true,
+  "dependencies": {
+    "@netlify/blobs": "^8.0.0"
+  }
+}
