@@ -26,7 +26,13 @@ const page = (statusCode, body) => ({
   body,
 });
 
-const store = () => getStore("rewards");
+// Uses SITE_ID + NETLIFY_API_TOKEN when set (fallback if Netlify does not inject Blobs config)
+const store = () =>
+  getStore(
+    process.env.SITE_ID && process.env.NETLIFY_API_TOKEN
+      ? { name: "rewards", siteID: process.env.SITE_ID, token: process.env.NETLIFY_API_TOKEN }
+      : { name: "rewards" }
+  );
 const now = () => new Date().toISOString();
 const clean = (v, max) => String(v == null ? "" : v).replace(/[\u0000-\u001f]/g, " ").trim().slice(0, max);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -281,4 +287,4 @@ ${order.rewardCode ? `<li><b>Feedback done, code:</b> ${esc(order.rewardCode)}</
 <p><a href="${waLink}" style="display:inline-block;background:#c9a441;color:#2a1d18;padding:.8rem 1.1rem;border-radius:999px;text-decoration:none;font-weight:600">Send feedback link to customer on WhatsApp</a></p>
 <p style="font-size:.85rem;color:#6b5a52">The link opens the feedback form for this order only. The customer gets a reward code after submitting it. Do not share this page.</p>
 </body></html>`);
-}
+    }
