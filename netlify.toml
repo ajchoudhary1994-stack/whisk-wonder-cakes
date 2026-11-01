@@ -1,0 +1,4 @@
+# Only the "site" folder is published. package.json, README, and netlify/functions source stay private.
+[build]
+  publish = "site"
+  functions = "netlify/functions"
