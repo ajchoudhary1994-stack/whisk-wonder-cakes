@@ -1,0 +1,30 @@
+/* Self-hosted fonts. No Google Fonts requests are needed.
+   Fraunces: Fraunces project, SIL Open Font License 1.1 (see OFL-Fraunces.txt).
+   Manrope: Mikhail Sharanda, SIL Open Font License 1.1 (see OFL-Manrope.txt). */
+
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("fraunces-roman-latin.woff") format("woff");
+}
+
+@font-face {
+  font-family: "Fraunces";
+  font-style: italic;
+  font-weight: 400 500;
+  font-display: swap;
+  src: url("fraunces-italic-latin.woff") format("woff");
+}
+
+/* Sharp (non-soft) letterforms, the default look of Fraunces on Google Fonts. */
+html { font-variation-settings: "SOFT" 0; }
+
+@font-face {
+  font-family: "Manrope";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("manrope-latin.woff") format("woff");
+}
