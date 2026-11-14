@@ -1,0 +1,126 @@
+/* ============ v20: celebration form, order journey, founder note, hero on phones, anchor offsets ============ */
+
+/* Hero on phones: the text starts below the header and the eyebrow sits clear of the logo */
+@media (max-width: 768px) {
+  .hero .hero-content { width: 100%; padding: 7.5rem 1.3rem 4.5rem; }
+}
+
+/* In-page links land below the sticky header */
+section[id] { scroll-margin-top: 72px; }
+
+/* Plan form */
+.plan-card { width: min(640px, 100%); padding: 1.6rem 1.5rem 1.8rem; }
+.plan-card .pd-close { top: .8rem; right: .8rem; }
+.plan-head h3 { font-family: var(--serif); font-size: 1.6rem; color: var(--brown); font-weight: 600; }
+.plan-head p { color: var(--brown-light); margin: .35rem 0 1.2rem; font-size: .95rem; }
+.pf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem 1rem; }
+.pf-wide { grid-column: 1 / -1; }
+.pf-field { display: flex; flex-direction: column; gap: .35rem; }
+.pf-field span { font-size: .78rem; font-weight: 700; letter-spacing: .04em; color: var(--brown); }
+.pf-field select, .pf-field input {
+  font: inherit; font-size: .98rem; padding: .75rem .85rem; border-radius: 12px;
+  border: 1px solid rgba(75,46,43,.22); background: #fff; color: var(--brown); width: 100%;
+}
+.pf-field select:focus, .pf-field input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,175,55,.25); }
+.pf-err { color: #9b2c2c; font-size: .9rem; margin-top: .9rem; font-weight: 600; }
+.pf-err[hidden] { display: none; }
+.pf-actions { display: flex; flex-wrap: wrap; gap: .7rem; margin-top: 1.2rem; }
+@media (max-width: 560px) { .pf-grid { grid-template-columns: 1fr; } }
+
+/* Founder: quieter, more personal */
+.founder-quote { font-size: clamp(1.3rem, 2.4vw, 1.7rem); }
+
+/* How we work: the order journey */
+.flow { max-width: 980px; margin: 2.5rem auto 0; }
+.flow-steps { list-style: none; padding: 0; margin: 0 0 2rem; display: grid; grid-template-columns: repeat(4, 1fr); gap: .6rem; }
+.flow-steps li {
+  display: flex; align-items: center; gap: .6rem; padding: .7rem .8rem; border-radius: 14px; cursor: pointer;
+  font-size: .85rem; font-weight: 700; color: var(--brown-light); background: rgba(75,46,43,.05);
+  transition: background .4s ease, color .4s ease, transform .4s var(--ease);
+}
+.flow-steps li span {
+  width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0;
+  background: #fff; color: var(--brown); border: 1px solid rgba(75,46,43,.2); font-size: .8rem;
+}
+.flow-steps li.is-on { background: linear-gradient(135deg, var(--gold-soft), var(--gold)); color: var(--brown); transform: translateY(-2px); }
+.flow-steps li.is-on span { background: var(--brown); color: var(--gold-soft); border-color: transparent; }
+.flow-steps li.is-done span { background: var(--gold-text); color: #fff; border-color: transparent; }
+.flow-steps li.is-done { color: var(--brown); }
+
+.flow-stage { min-height: 360px; background: #fffdf8; border: 1px solid rgba(212,175,55,.3); border-radius: 26px; padding: clamp(1.4rem, 3vw, 2.2rem); box-shadow: 0 30px 60px -40px rgba(75,46,43,.45); }
+.fl-lead { font-family: var(--serif); font-size: 1.25rem; color: var(--brown); margin-bottom: 1rem; }
+.fl-choices { display: grid; grid-template-columns: repeat(4, 1fr); gap: .9rem; }
+.fl-choice {
+  all: unset; box-sizing: border-box; cursor: pointer; border-radius: 18px; overflow: hidden; background: #fff;
+  border: 2px solid transparent; box-shadow: 0 16px 30px -24px rgba(75,46,43,.6); transition: transform .35s var(--ease), border-color .3s ease;
+}
+.fl-choice:hover { transform: translateY(-4px); }
+.fl-choice:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.fl-choice.is-picked { border-color: var(--gold); }
+.fl-choice img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; }
+.fl-choice span { display: block; padding: .7rem .6rem; font-size: .85rem; font-weight: 700; color: var(--brown); text-align: center; }
+.fl-pick { display: grid; grid-template-columns: 220px 1fr; gap: 1.6rem; align-items: center; }
+.fl-pick img { width: 100%; border-radius: 18px; aspect-ratio: 3 / 4; object-fit: cover; box-shadow: 0 20px 40px -26px rgba(75,46,43,.6); }
+.fl-pick p { color: var(--brown-light); margin-bottom: 1.2rem; line-height: 1.6; }
+.fl-pick .btn { margin-top: .4rem; }
+.fl-kitchen { display: flex; flex-direction: column; align-items: center; gap: 1rem; text-align: center; }
+.fl-oven { width: 220px; border-radius: 18px; overflow: hidden; box-shadow: 0 0 0 6px rgba(212,175,55,.25), 0 24px 40px -22px rgba(75,46,43,.6); }
+.fl-oven img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; animation: flGlow 1.6s ease-in-out infinite alternate; }
+@keyframes flGlow { from { filter: brightness(.92) saturate(1); } to { filter: brightness(1.08) saturate(1.15); } }
+.fl-bar { width: min(360px, 100%); height: 8px; border-radius: 8px; background: rgba(75,46,43,.12); overflow: hidden; }
+.fl-bar span { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--gold-soft), var(--gold)); transform: scaleX(0); }
+.fl-deliver { display: flex; flex-direction: column; align-items: center; gap: 1rem; text-align: center; min-height: 260px; justify-content: center; overflow: hidden; }
+.fl-bag { width: 130px; }
+.fl-bag svg { width: 100%; height: auto; display: block; filter: drop-shadow(0 18px 24px rgba(75,46,43,.35)); }
+.fl-nav { display: flex; justify-content: space-between; gap: 1rem; margin-top: 1.3rem; }
+.fl-nav .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
+
+@media (max-width: 760px) {
+  .flow-steps { grid-template-columns: repeat(2, 1fr); }
+  .fl-choices { grid-template-columns: repeat(2, 1fr); }
+  .fl-pick { grid-template-columns: 1fr; text-align: center; }
+  .fl-pick img { max-width: 240px; margin: 0 auto; }
+}
+
+/* outline buttons on the light panels */
+.flow .btn-outline, .plan-card .btn-outline { color: var(--brown); border-color: rgba(75,46,43,.35); background: transparent; }
+.flow .btn-outline:hover, .plan-card .btn-outline:hover { border-color: var(--gold); background: rgba(212,175,55,.08); }
+.fl-deliver { position: relative; }
+.fl-bagwrap { position: relative; width: 150px; height: 170px; }
+.fl-bagcake { position: absolute; left: 50%; top: 4px; width: 84px; height: 112px; transform: translateX(-50%); object-fit: cover; border-radius: 12px; box-shadow: 0 10px 20px -10px rgba(75,46,43,.6); }
+.fl-bagwrap .fl-bag { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); }
+
+/* ---- v21: animated scenes (no photos) for How we work ---- */
+.fl-choices { grid-template-columns: repeat(3, 1fr); max-width: 760px; margin: 0 auto; }
+.fl-choice { padding: 1rem .6rem .8rem; background: #fff; }
+.fl-choice svg { display: block; width: 100%; height: auto; }
+.fl-choice span { padding: .6rem .2rem 0; }
+.fl-phonewrap { display: grid; grid-template-columns: 260px 1fr; gap: 2rem; align-items: center; }
+.fl-phone { width: 240px; height: 380px; margin: 0 auto; border-radius: 34px; background: #1d1210; padding: 14px; box-shadow: 0 30px 50px -24px rgba(75,46,43,.7); }
+.fl-screen { height: 100%; border-radius: 24px; background: #efe6d8; display: flex; flex-direction: column; overflow: hidden; }
+.fl-head { display: flex; align-items: center; gap: .55rem; padding: .8rem .9rem; background: #075e54; color: #fff; font-size: .8rem; font-weight: 700; }
+.fl-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--gold); color: var(--brown); display: grid; place-items: center; font-size: .6rem; }
+.fl-chat { flex: 1; padding: 1rem .8rem; display: flex; flex-direction: column; align-items: flex-end; gap: .4rem; }
+.fl-bubble { max-width: 92%; min-height: 3.2rem; background: #dcf8c6; color: #1d1210; padding: .6rem .75rem; border-radius: 14px 14px 2px 14px; font-size: .88rem; line-height: 1.4; box-shadow: 0 4px 10px -6px rgba(0,0,0,.4); }
+.fl-tick { font-size: .7rem; color: #3f8fd2; opacity: 0; }
+.fl-copy p { color: var(--brown-light); margin: .5rem 0 1.1rem; line-height: 1.6; }
+.fl-copy-c { text-align: center; margin-top: 1rem; display: flex; flex-direction: column; align-items: center; gap: .8rem; }
+.fl-kitchen { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+.fl-oven { width: min(300px, 90%); height: auto; }
+.fl-timer { text-align: center; }
+.fl-timer span { display: block; font-family: var(--serif); font-size: 2rem; color: var(--brown); font-variant-numeric: tabular-nums; }
+.fl-timer small { font-size: .9rem; color: var(--brown-light); }
+.fl-bar { width: min(340px, 100%); height: 8px; border-radius: 8px; background: rgba(75,46,43,.12); overflow: hidden; }
+.fl-bar span { display: block; width: 100%; height: 100%; background: linear-gradient(90deg, var(--gold-soft), var(--gold)); transform-origin: left center; }
+.fl-road { width: min(460px, 100%); height: auto; display: block; margin: 0 auto; }
+.fl-house { }
+@media (max-width: 760px) {
+  .fl-phonewrap { grid-template-columns: 1fr; text-align: center; }
+  .fl-copy p { margin-inline: auto; }
+  .fl-choices { grid-template-columns: repeat(3, 1fr); gap: .5rem; }
+}
+
+/* v22: each scene carries its own step header; the separate step list is gone */
+.fl-step-tag { display: flex; align-items: center; gap: .6rem; font-family: var(--sans, inherit); font-size: .8rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--brown-light); margin: 0 0 1.1rem; }
+.fl-step-tag span { background: var(--brown); color: var(--gold-soft); padding: .3rem .7rem; border-radius: 100px; font-size: .72rem; letter-spacing: .06em; }
+.fl-timer span { font-size: 2.1rem; }
