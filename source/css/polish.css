@@ -1,0 +1,80 @@
+/* ============ POLISH LAYER (loaded last) ============
+   Finishing touches: button sheen and press feel, card depth, brand selection and scrollbar,
+   spotlight on dark sections, consistent focus rings. Layout and content are untouched. */
+
+::selection { background: rgba(212,175,55,.35); color: var(--black, #1d1210); }
+
+html { scrollbar-color: #d4af37 transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(75,46,43,.25); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(212,175,55,.7); background-clip: padding-box; }
+
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 6px; }
+
+/* Buttons: a light sheen sweeps across on hover, and they press in on click */
+.btn { position: relative; overflow: hidden; isolation: isolate;
+  transition: transform .45s var(--ease), box-shadow .45s var(--ease), background-color .3s ease, color .3s ease, border-color .3s ease; }
+.btn::after {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.55) 50%, transparent 65%);
+  transform: translateX(-120%); transition: transform .9s var(--ease);
+}
+.btn:hover::after { transform: translateX(120%); }
+.btn:active { transform: translateY(1px) scale(.985); transition-duration: .12s; }
+.btn-gold:hover { box-shadow: 0 16px 34px -12px rgba(212,175,55,.8); }
+.btn-dark:hover { box-shadow: 0 16px 34px -14px rgba(28,20,15,.6); }
+.btn-outline:hover { border-color: var(--gold); }
+
+/* Cards: lift via shadow only (transform belongs to the 3D tilt) */
+.party-card, .cat-card, .why-card, .review-card, .contact-card {
+  transition: box-shadow .6s var(--ease), background-color .4s ease;
+}
+.party-card:hover, .cat-card:hover, .why-card:hover, .review-card:hover {
+  box-shadow: 0 28px 56px -26px rgba(75,46,43,.45), 0 0 0 1px rgba(212,175,55,.22);
+}
+
+/* Nav links: thin gold underline grows from the left */
+.nav-links a, nav a:not(.btn) { position: relative; }
+.nav-links a::after, nav a:not(.btn)::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -6px; height: 1px;
+  background: var(--gold); transform: scaleX(0); transform-origin: left; transition: transform .5s var(--ease);
+}
+.nav-links a:hover::after, nav a:not(.btn):hover::after { transform: scaleX(1); }
+
+/* Spotlight: a soft gold light follows the pointer across the dark sections.
+   Drawn as a pseudo-element so it never replaces the section's own background. */
+.signature::after, .gallery::after, .delivery-banner::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 30%), rgba(212,175,55,.10), transparent 60%);
+}
+.signature { --mx: 70%; --my: 40%; }
+.signature > .container, .gallery > .container, .delivery-banner > .container { position: relative; z-index: 1; }
+
+/* Gold text on light backgrounds: a deeper gold keeps WCAG AA contrast (about 5:1 on white). */
+:root { --gold-text: #6e5510; }
+section:not(.signature):not(.gallery):not(.delivery-banner):not(.hero):not(.plan-band):not(.made-for-you) .eyebrow { color: var(--gold-text); }
+section:not(.signature):not(.gallery):not(.delivery-banner):not(.hero):not(.plan-band):not(.made-for-you) .section-title em { color: var(--gold-text); }
+
+/* Gallery captions on photos: a darker base so the name reads on any photo */
+.gallery-item .g-overlay { background: linear-gradient(180deg, rgba(15,9,7,0) 38%, rgba(15,9,7,.94)); }
+.gallery-item .g-overlay em { color: #f5e3b0; }
+
+/* Subtle page entry on the body */
+@media (prefers-reduced-motion: no-preference) {
+  body.motion-ready main, body.motion-ready .hero { animation: ww-fade .9s var(--ease) both; }
+}
+@keyframes ww-fade { from { opacity: 0; } to { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn, .btn::after, .nav-links a::after { transition: none; }
+}
+
+/* Text the page styles in brand gold or rose on light backgrounds (set by motion.js) */
+.ww-fix-gold { color: #6e5510 !important; }
+.ww-fix-rose { color: #8a3f5c !important; }
+
+/* Category tiles (occasion cards): a stronger scrim and brighter label so text reads on any photo */
+.cat-card::after { background: linear-gradient(180deg, rgba(15,9,7,0) 34%, rgba(15,9,7,.94) 78%); }
+.cat-card .cat-label span { color: #f5e3b0; }
+.cat-card .cat-label h3 { text-shadow: 0 1px 12px rgba(0,0,0,.45); }

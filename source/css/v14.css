@@ -1,0 +1,138 @@
+/* ============ v14: signature assembly, premium why cards, party store without photos,
+   made-for-you and plan bands, real cake photos, smoother gallery ============ */
+
+/* --- Signature: layer-by-layer assembly --- */
+.signature .sig-grid { align-items: center; }
+.assemble { position: relative; width: min(340px, 90vw); height: 300px; margin: 0 auto; }
+.lay { position: absolute; left: 50%; transform: translateX(-50%); }
+.lay::before { content: ''; position: absolute; left: 0; right: 0; top: -14px; height: 28px; border-radius: 50%; background: inherit; filter: brightness(1.08); }
+.lay-sponge {
+  background:
+    radial-gradient(circle at 18% 35%, rgba(255,240,200,.55) 0 2px, transparent 3px),
+    radial-gradient(circle at 72% 62%, rgba(150,88,36,.28) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 46% 70%, rgba(255,240,200,.4) 0 1.5px, transparent 2.5px),
+    linear-gradient(180deg, #f5dba0, #d9a25e);
+  border-radius: 0 0 48% 48% / 0 0 22px 22px;
+  box-shadow: inset 0 -6px 12px rgba(120,64,20,.25);
+}
+.lay-cream {
+  background: linear-gradient(180deg, #fffdf7, #eee1cc);
+  border-radius: 0 0 40% 40% / 0 0 10px 10px;
+}
+.lay-fruit {
+  background: radial-gradient(circle, #d7364f 0 3.5px, transparent 4.5px) 0 0 / 15px 13px, linear-gradient(180deg, #fffdf7, #eee1cc);
+  border-radius: 0 0 40% 40% / 0 0 10px 10px;
+}
+.lay-sprinkle {
+  background:
+    radial-gradient(circle, #d4af37 0 2px, transparent 2.6px) 0 0 / 14px 10px,
+    radial-gradient(circle, #ffffff 0 2px, transparent 2.6px) 7px 5px / 14px 10px,
+    linear-gradient(180deg, #fbf0dc, #ead9bd);
+  border-radius: 0 0 40% 40% / 0 0 8px 8px;
+}
+.lay-top {
+  background:
+    radial-gradient(circle, #d4af37 0 2.4px, transparent 3px) 10px 10px / 26px 22px,
+    linear-gradient(180deg, #4b2e2b, #2a1613);
+  border-radius: 0 0 44% 44% / 0 0 18px 18px;
+}
+.l1 { bottom: 0; width: 270px; height: 64px; }
+.l2 { bottom: 64px; width: 276px; height: 18px; }
+.l3 { bottom: 82px; width: 248px; height: 64px; }
+.l4 { bottom: 146px; width: 254px; height: 18px; }
+.l5 { bottom: 164px; width: 254px; height: 18px; }
+.l6 { bottom: 182px; width: 236px; height: 22px; }
+.l7 { bottom: 204px; width: 220px; height: 44px; }
+
+.assemble-steps { list-style: none; padding: 0; margin: 1.6rem 0 0; display: grid; gap: .55rem; }
+.assemble-steps li {
+  display: flex; align-items: center; gap: .8rem; font-size: .95rem; color: rgba(255,253,248,.45);
+  padding: .55rem .9rem; border-radius: 12px; border: 1px solid rgba(255,255,255,.06);
+  transition: color .5s var(--ease), background .5s var(--ease), border-color .5s var(--ease);
+}
+.assemble-steps .st-n { font-family: var(--serif); font-size: .85rem; color: var(--gold); opacity: .8; min-width: 1.8rem; }
+.assemble-steps li.is-on { color: var(--ivory); background: rgba(212,175,55,.12); border-color: rgba(212,175,55,.45); }
+.assemble-steps li.is-done { color: rgba(255,253,248,.8); }
+.assemble-steps li.is-done .st-n::after { content: ' ✓'; color: var(--gold-soft); }
+.sig-hint { color: rgba(255,253,248,.55); }
+
+.sig-cakes-title { text-align: center; margin: 4rem 0 1.4rem; font-size: .75rem; letter-spacing: .22em; text-transform: uppercase; color: var(--gold-soft); }
+.sig-cakes { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(.8rem, 2vw, 1.4rem); }
+.sig-cakes figure { margin: 0; position: relative; border-radius: 20px; overflow: hidden; background: #1d1210; box-shadow: 0 30px 50px -30px rgba(0,0,0,.8); }
+.sig-cakes img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; }
+.sig-cakes figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 2.2rem .9rem .8rem; font-size: .8rem; color: var(--ivory); background: linear-gradient(180deg, transparent, rgba(15,9,7,.85)); }
+@media (max-width: 640px) { .sig-cakes { grid-template-columns: 1fr; } .sig-cakes img { aspect-ratio: 4 / 3; } }
+
+/* --- Cake collection: real photo on one card, clean tiles until real photos are supplied --- */
+.cat-ph { position: absolute; inset: 0; background: radial-gradient(120% 90% at 30% 20%, #6e4a40 0%, #3a2420 55%, #1d1210 100%); }
+.cat-ph::after { content: ''; position: absolute; inset: 14% 14% auto; height: 1px; background: linear-gradient(90deg, transparent, rgba(212,175,55,.6), transparent); }
+
+/* --- Party store: item cards without photos --- */
+.party-mark { background: radial-gradient(circle at 50% 35%, #fff 0%, var(--blush) 100%); }
+.party-mark span {
+  width: 84px; height: 84px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-family: var(--serif); font-size: 2.4rem; font-weight: 600; color: var(--brown);
+  background: linear-gradient(145deg, #fff6d8, #e8c76a); box-shadow: 0 16px 30px -16px rgba(110,85,16,.6), inset 0 1px 0 rgba(255,255,255,.7);
+}
+
+/* --- Why Whisk & Wonder: premium cards (no transform clash with reveal) --- */
+.why-card {
+  position: relative; overflow: hidden; border-radius: 24px; padding: 2.2rem 1.8rem;
+  background: linear-gradient(160deg, rgba(255,255,255,.92), rgba(251,241,230,.85));
+  border: 1px solid rgba(212,175,55,.32);
+  box-shadow: 0 26px 50px -36px rgba(75,46,43,.55), inset 0 1px 0 rgba(255,255,255,.9);
+}
+.why-card::before { content: ''; position: absolute; left: 1.8rem; right: 1.8rem; top: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--gold), transparent); }
+.why-card svg {
+  width: 56px; height: 56px; padding: 14px; border-radius: 50%; color: var(--brown);
+  background: linear-gradient(145deg, #fff6d8, #e8c76a); box-shadow: 0 12px 24px -14px rgba(110,85,16,.7); margin-bottom: 1.3rem;
+}
+.why-card h3 { font-family: var(--serif); font-size: 1.3rem; font-weight: 600; color: var(--brown); }
+.why-card p { font-size: .92rem; line-height: 1.65; color: var(--brown-light); margin-top: .6rem; }
+.why-card:hover { box-shadow: 0 34px 60px -34px rgba(75,46,43,.6), 0 0 0 1px rgba(212,175,55,.35); background: #fffdf8; }
+
+/* --- Made for you: its own panel, same colours, clear text --- */
+.made-for-you { position: relative; padding: clamp(3.5rem, 7vw, 6rem) 0; background: var(--brown); color: var(--ivory); }
+.made-for-you .container { display: flex; justify-content: center; }
+.made-for-you .gallery-cta {
+  grid-column: auto; width: min(760px, 100%); text-align: center; align-items: center;
+  padding: clamp(2rem, 4vw, 3rem) clamp(1.4rem, 4vw, 3rem); border-radius: 26px;
+  background: linear-gradient(135deg, rgba(212,175,55,.18), rgba(255,255,255,.05));
+  border: 1px solid rgba(236,212,140,.4); box-shadow: 0 30px 60px -40px rgba(0,0,0,.7);
+}
+.made-for-you .gallery-cta .eyebrow { color: var(--gold-soft); }
+.made-for-you .gallery-cta h3 { font-family: var(--serif); font-size: clamp(1.6rem, 3vw, 2.2rem); color: var(--ivory); font-weight: 600; }
+.made-for-you .gallery-cta p { color: rgba(255,253,248,.86); font-size: 1rem; max-width: 46ch; }
+
+/* --- Plan my celebration band --- */
+.plan-band {
+  position: relative; overflow: hidden; text-align: center; padding: clamp(4rem, 8vw, 6.5rem) 0;
+  background: radial-gradient(60% 80% at 50% 0%, rgba(212,175,55,.22), transparent 70%), linear-gradient(180deg, #2b1a16, #1d1210);
+  color: var(--ivory);
+}
+.plan-inner { display: flex; flex-direction: column; align-items: center; }
+.plan-band .eyebrow { color: var(--gold-soft); }
+.plan-band .section-title { color: var(--ivory); margin-top: .8rem; font-size: clamp(2rem, 4.4vw, 3.2rem); }
+.plan-band .section-title em { color: var(--gold-soft); font-style: italic; }
+.plan-band p { color: rgba(255,253,248,.8); max-width: 56ch; margin: 1.2rem 0 2rem; line-height: 1.7; }
+.plan-band .hero-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .9rem; }
+.plan-band .btn-outline { border-color: rgba(255,253,248,.35); color: var(--ivory); }
+
+/* --- Founder: calm note with a soft frame --- */
+.founder-body p:not(.founder-tagline) { max-width: 56ch; }
+
+/* --- Gallery: GPU-friendly, no per-frame filters or heavy shadows --- */
+.gallery-grid.is-ring { contain: layout paint; }
+.gallery-grid.is-ring .gallery-item,
+.gallery-grid.is-ring .gallery-item.feature,
+.gallery-grid.is-ring .gallery-item.wide,
+.gallery-grid.is-ring .gallery-item.wide-full {
+  box-shadow: 0 0 0 1px rgba(212,175,55,.22), 0 18px 30px -22px rgba(0,0,0,.6);
+  will-change: auto;
+}
+.gallery-grid.is-ring.is-dragging .gallery-item { will-change: transform; }
+.gallery-grid.is-ring .gallery-item.is-front { box-shadow: 0 0 0 2px rgba(212,175,55,.7), 0 24px 40px -20px rgba(0,0,0,.7); }
+
+@media (prefers-reduced-motion: reduce) {
+  .assemble-steps li { transition: none; }
+}

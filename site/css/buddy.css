@@ -1,0 +1,22 @@
+/* Wonder: the cake buddy. Floats around the page, does tricks, and reacts to what the customer does. */
+.ww-buddy{--wwb:84px;position:fixed;left:0;top:0;z-index:840;display:flex;align-items:flex-end;gap:.35rem;pointer-events:none;will-change:transform}
+.ww-buddy .wrap{position:relative;width:var(--wwb);height:var(--wwb);pointer-events:none}
+.ww-buddy .av,.ww-buddy .bob{width:100%;height:100%}
+.ww-buddy .av{pointer-events:auto;cursor:pointer;filter:drop-shadow(0 8px 10px rgba(75,46,43,.28))}
+.ww-buddy .x{position:absolute;top:-8px;left:-8px;width:22px;height:22px;border-radius:50%;border:1px solid rgba(212,175,55,.6);background:#fff9f0;color:#4B2E2B;font:700 13px/1 system-ui,sans-serif;cursor:pointer;pointer-events:auto;padding:0;z-index:2}
+.ww-buddy.flip{flex-direction:row-reverse}
+.ww-buddy .bub{max-width:min(230px,52vw);margin-bottom:1.1rem;background:#fff9f0;color:#4B2E2B;border:1px solid rgba(212,175,55,.6);border-radius:16px 16px 16px 4px;padding:.55rem .8rem;font-family:inherit;font-weight:600;font-size:.92rem;line-height:1.35;box-shadow:0 10px 24px rgba(75,46,43,.2);opacity:0;transform:translateY(6px) scale(.96);transition:opacity .25s,transform .25s}
+.ww-buddy.flip .bub{border-radius:16px 16px 4px 16px}
+.ww-buddy .bub{pointer-events:none}.ww-buddy .bub.show{pointer-events:auto;cursor:pointer}
+.ww-buddy.with-cart{z-index:1060}
+.ww-buddy.below{align-items:flex-start}.ww-buddy.below .bub{margin-bottom:0;margin-top:.2rem}
+.ww-buddy .bub.show{opacity:1;transform:none}
+.ww-buddy .mo,.ww-buddy .tg{opacity:0;transform-box:fill-box;transition:opacity .15s,transform .15s}
+.ww-buddy .mo{transform-origin:50% 50%;transform:scaleY(.1)}
+.ww-buddy .mo.on{opacity:1;transform:none}
+.ww-buddy .tg{transform-origin:50% 0}
+.ww-buddy .tg.on{opacity:1}
+@media (max-width:640px){.ww-buddy{--wwb:74px}.ww-buddy.with-cart{--wwb:62px}.ww-buddy .bub{font-size:.9rem;max-width:min(240px,calc(100vw - var(--wwb) - 28px))}}
+@media (prefers-reduced-motion:reduce){.ww-buddy .bub,.ww-buddy .mo,.ww-buddy .tg{transition:none}}
+@media print{.ww-buddy{display:none}}
+.ww-buddy.popup .av,.ww-buddy.popup .bub{pointer-events:none}.ww-buddy.popup .x{display:none}

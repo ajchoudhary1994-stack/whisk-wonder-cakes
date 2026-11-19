@@ -1,0 +1,299 @@
+/*
+ * 3D chocolate ganache cake: a raymarched signed-distance scene in one WebGL fragment shader.
+ * No library, no network, no inline code (CSP-safe). Drag or use left/right arrows to turn it.
+ * Renders only while visible, uses a lower resolution on phones, and draws one still frame for reduced motion.
+ */
+(function () {
+  'use strict';
+
+  var FRAG = [
+    'precision highp float;',
+    'varying vec2 vUv;',
+    'uniform vec2 uRes;',
+    'uniform float uTime;',
+    'uniform float uYaw;',
+    '#define PI 3.14159265',
+
+    'float hash(float n){ return fract(sin(n) * 43758.5453); }',
+
+    'float smin(float a, float b, float k){',
+    '  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);',
+    '  return mix(b, a, h) - k * h * (1.0 - h);',
+    '}',
+
+    'float sdRoundCyl(vec3 p, float r, float h, float rr){',
+    '  vec2 d = vec2(length(p.xz) - r + rr, abs(p.y) - h + rr);',
+    '  return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)) - rr;',
+    '}',
+
+    'float sdTorus(vec3 p, float R, float r){',
+    '  vec2 q = vec2(length(p.xz) - R, p.y);',
+    '  return length(q) - r;',
+    '}',
+
+    // Ganache drips hanging from a tier's top edge (radius R, top height yT).
+    // About half of the angular sectors carry a drip, each with its own length.
+    'float drips(vec3 p, float R, float yT, float seed){',
+    '  float sector = 2.0 * PI / 22.0;',
+    '  float ang = atan(p.z, p.x);',
+    '  float id = floor(ang / sector + 0.5);',
+    '  float la = ang - id * sector;',
+    '  float rad = length(p.xz);',
+    '  float h = hash(id * 13.1 + seed);',
+    '  if (h < 0.45) return 1.0;',
+    '  float len = 0.07 + 0.30 * fract(h * 7.3);',
+    '  float wid = 0.028 + 0.012 * fract(h * 3.1);',
+    '  float tang = rad * sin(la);',
+    '  float yy = clamp(p.y, yT - len, yT);',
+    '  float dd = length(vec2(tang, p.y - yy)) - wid;',
+    '  float dr = abs(rad - (R + 0.012)) - 0.02;',
+    '  return max(dd, dr);',
+    '}',
+
+    // Scene: returns (distance, material id)
+    // 0 plate, 1 chocolate, 2 gold, 3 truffle, 4 cherry
+    'vec2 scene(vec3 p){',
+    '  vec2 res = vec2(sdRoundCyl(p - vec3(0.0, -0.06, 0.0), 2.05, 0.05, 0.03), 0.0);',
+
+    '  float t1 = sdRoundCyl(p - vec3(0.0, 0.45, 0.0), 1.0, 0.45, 0.07);',
+    '  float t2 = sdRoundCyl(p - vec3(0.0, 1.10, 0.0), 0.72, 0.20, 0.06);',
+    '  float t3 = sdRoundCyl(p - vec3(0.0, 1.50, 0.0), 0.46, 0.20, 0.05);',
+    '  float cake = smin(t1, t2, 0.03);',
+    '  cake = smin(cake, t3, 0.03);',
+
+    '  float dr = min(drips(p, 1.0, 0.90, 1.0), drips(p, 0.72, 1.30, 2.0));',
+    '  dr = min(dr, drips(p, 0.46, 1.70, 3.0));',
+    '  cake = smin(cake, dr, 0.02);',
+    '  res = (cake < res.x) ? vec2(cake, 1.0) : res;',
+
+    '  float gold = min(sdTorus(p - vec3(0.0, 1.30, 0.0), 0.735, 0.022),',
+    '                   sdTorus(p - vec3(0.0, 1.70, 0.0), 0.475, 0.020));',
+    '  gold = min(gold, sdRoundCyl(p - vec3(0.0, 1.735, 0.0), 0.36, 0.008, 0.006));',
+    '  res = (gold < res.x) ? vec2(gold, 2.0) : res;',
+
+    '  for (int i = 0; i < 6; i++) {',
+    '    float a = float(i) * 1.0471976 + 0.5;',
+    '    vec3 c = vec3(cos(a) * 0.30, 1.79, sin(a) * 0.30);',
+    '    float tr = length(p - c) - 0.105;',
+    '    res = (tr < res.x) ? vec2(tr, 3.0) : res;',
+    '  }',
+
+    '  float ch = length(p - vec3(0.0, 1.97, 0.0)) - 0.12;',
+    '  res = (ch < res.x) ? vec2(ch, 4.0) : res;',
+    '  return res;',
+    '}',
+
+    'vec2 march(vec3 ro, vec3 rd){',
+    '  float t = 0.0;',
+    '  for (int i = 0; i < 72; i++) {',
+    '    vec2 h = scene(ro + rd * t);',
+    '    if (h.x < 0.0008 * t) return vec2(t, h.y);',
+    '    t += h.x * 0.9;',
+    '    if (t > 14.0) break;',
+    '  }',
+    '  return vec2(t, -1.0);',
+    '}',
+
+    'vec3 normalAt(vec3 p){',
+    '  vec2 e = vec2(0.0012, -0.0012);',
+    '  return normalize(',
+    '    e.xyy * scene(p + e.xyy).x +',
+    '    e.yyx * scene(p + e.yyx).x +',
+    '    e.yxy * scene(p + e.yxy).x +',
+    '    e.xxx * scene(p + e.xxx).x);',
+    '}',
+
+    'float softShadow(vec3 ro, vec3 rd){',
+    '  float res = 1.0;',
+    '  float t = 0.05;',
+    '  for (int i = 0; i < 18; i++) {',
+    '    float h = scene(ro + rd * t).x;',
+    '    res = min(res, 8.0 * h / t);',
+    '    t += clamp(h, 0.03, 0.25);',
+    '    if (res < 0.002 || t > 7.0) break;',
+    '  }',
+    '  return smoothstep(0.0, 1.0, clamp(res, 0.0, 1.0));',
+    '}',
+
+    'float ambientOcc(vec3 p, vec3 n){',
+    '  float occ = 0.0;',
+    '  float sca = 1.0;',
+    '  for (int i = 0; i < 4; i++) {',
+    '    float h = 0.03 + 0.11 * float(i);',
+    '    float d = scene(p + n * h).x;',
+    '    occ += (h - d) * sca;',
+    '    sca *= 0.92;',
+    '  }',
+    '  return clamp(1.0 - 2.0 * occ, 0.0, 1.0);',
+    '}',
+
+    'void main(){',
+    '  vec2 uv = (vUv * 2.0 - 1.0);',
+    '  uv.x *= uRes.x / uRes.y;',
+
+    '  float yaw = uTime * 0.16 + uYaw;',
+    '  float pitch = 0.20;',
+    '  vec3 target = vec3(0.0, 1.0, 0.0);',
+    '  vec3 ro = target + 4.5 * vec3(cos(pitch) * sin(yaw), sin(pitch), cos(pitch) * cos(yaw));',
+    '  vec3 ww = normalize(target - ro);',
+    '  vec3 uu = normalize(cross(ww, vec3(0.0, 1.0, 0.0)));',
+    '  vec3 vv = cross(uu, ww);',
+    '  vec3 rd = normalize(uv.x * uu + uv.y * vv + 1.75 * ww);',
+
+    // bounding sphere early-out: most background pixels skip the march entirely
+    '  vec3 oc = ro - vec3(0.0, 1.0, 0.0);',
+    '  float bq = dot(oc, rd);',
+    '  float bc = dot(oc, oc) - 2.6 * 2.6;',
+    '  if (bq * bq - bc < 0.0) { gl_FragColor = vec4(0.0); return; }',
+
+    '  vec2 r = march(ro, rd);',
+    '  if (r.y < -0.5) { gl_FragColor = vec4(0.0); return; }',
+
+    '  vec3 p = ro + rd * r.x;',
+    '  vec3 n = normalAt(p);',
+    '  float m = r.y;',
+    '  vec3 V = -rd;',
+    '  vec3 L = normalize(vec3(0.55, 0.95, 0.45));',
+    '  vec3 H = normalize(L + V);',
+    '  float dif = clamp(dot(n, L), 0.0, 1.0);',
+    '  vec3 key = vec3(1.00, 0.94, 0.84);',
+    '  vec3 fill = vec3(0.55, 0.60, 0.78) * 0.22;',
+    '  vec3 refl = reflect(rd, n);',
+    '  vec3 env = mix(vec3(0.10, 0.07, 0.05), vec3(1.0, 0.90, 0.74), smoothstep(-0.25, 0.85, refl.y));',
+    '  float fres = pow(1.0 - clamp(dot(n, V), 0.0, 1.0), 4.0);',
+    '  vec3 col;',
+
+    '  if (m < 0.5) {',
+    // plate: cream porcelain with a soft contact shadow under the cake
+    '    float rad = length(p.xz);',
+    '    float shade = mix(0.38, 1.0, smoothstep(0.98, 1.75, rad));',
+    '    col = vec3(0.98, 0.94, 0.87) * (key * dif * 0.95 + fill * 0.8 + 0.08) * shade;',
+    '  } else {',
+    '    vec3 albedo; float spec; float shin;',
+    '    if (m < 1.5)      { albedo = vec3(0.26, 0.112, 0.058); spec = 1.0;  shin = 140.0; }',
+    '    else if (m < 2.5) { albedo = vec3(1.00, 0.80, 0.36);   spec = 1.0;  shin = 200.0; }',
+    '    else if (m < 3.5) { albedo = vec3(0.13, 0.060, 0.035); spec = 0.8;  shin = 70.0; }',
+    '    else              { albedo = vec3(0.66, 0.030, 0.055); spec = 0.9;  shin = 120.0; }',
+    '    float sh = softShadow(p + n * 0.01, L);',
+    '    float occ = ambientOcc(p, n);',
+    '    float sky = 0.5 + 0.5 * n.y;',
+    '    float sp = pow(clamp(dot(n, H), 0.0, 1.0), shin) * spec;',
+    '    col = albedo * (key * dif * sh * 1.35 + fill * sky + vec3(0.30, 0.20, 0.13) * occ * 0.55) * occ;',
+    '    col += key * sp * sh * 1.6;',
+    // glossy ganache reflects the warm room
+    '    col += env * spec * (0.10 + 0.55 * fres) * occ;',
+    '  }',
+
+    // filmic tone map and gamma
+    '  col = col / (1.0 + col * 0.8);',
+    '  col = pow(col, vec3(0.92));',
+    '  gl_FragColor = vec4(col, 1.0);',
+    '}'
+  ].join('\n');
+
+  var VERT = 'attribute vec2 aPos; varying vec2 vUv;' +
+    'void main(){ vUv = aPos * 0.5 + 0.5; gl_Position = vec4(aPos, 0.0, 1.0); }';
+
+  function compile(gl, type, src) {
+    var s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    return gl.getShaderParameter(s, gl.COMPILE_STATUS) ? s : null;
+  }
+
+  function init(canvas) {
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var touch = window.matchMedia('(pointer: coarse)').matches;
+    var gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: true, antialias: false, powerPreference: 'default' });
+    if (!gl) return;   // no WebGL: the section keeps its text and CTA
+
+    var vs = compile(gl, gl.VERTEX_SHADER, VERT);
+    var fs = compile(gl, gl.FRAGMENT_SHADER, FRAG);
+    if (!vs || !fs) return;
+    var prog = gl.createProgram();
+    gl.attachShader(prog, vs); gl.attachShader(prog, fs);
+    gl.bindAttribLocation(prog, 0, 'aPos');
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+    gl.useProgram(prog);
+
+    var buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+    var uRes = gl.getUniformLocation(prog, 'uRes');
+    var uTime = gl.getUniformLocation(prog, 'uTime');
+    var uYaw = gl.getUniformLocation(prog, 'uYaw');
+
+    // Lower resolution on phones keeps frames smooth.
+    var quality = touch ? 0.7 : 1.0;
+    var maxDpr = touch ? 1.5 : 2.0;
+    function resize() {
+      var w = canvas.clientWidth, h = canvas.clientHeight;
+      if (!w || !h) return;
+      var dpr = Math.min(window.devicePixelRatio || 1, maxDpr) * quality;
+      canvas.width = Math.max(1, Math.round(w * dpr));
+      canvas.height = Math.max(1, Math.round(h * dpr));
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.uniform2f(uRes, canvas.width, canvas.height);
+    }
+    resize();
+    window.addEventListener('resize', resize, { passive: true });
+
+    // Drag to turn with inertia; arrow keys for keyboard users.
+    var yawTarget = 0, yawNow = 0, vel = 0, dragging = false, lastX = 0;
+    canvas.addEventListener('pointerdown', function (e) {
+      dragging = true; lastX = e.clientX; vel = 0;
+      if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
+    });
+    canvas.addEventListener('pointermove', function (e) {
+      if (!dragging) return;
+      var dx = (e.clientX - lastX) * 0.009;
+      lastX = e.clientX;
+      yawTarget += dx;
+      vel = dx;
+    });
+    function endDrag() { dragging = false; }
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowLeft')  { yawTarget -= 0.25; e.preventDefault(); }
+      if (e.key === 'ArrowRight') { yawTarget += 0.25; e.preventDefault(); }
+    });
+
+    var start = performance.now();
+    var visible = false, rafId = 0;
+    function draw(now) {
+      if (!dragging) { yawTarget += vel; vel *= 0.92; }
+      yawNow += (yawTarget - yawNow) * 0.12;
+      gl.uniform1f(uTime, reduce ? 0.6 : (now - start) / 1000);
+      gl.uniform1f(uYaw, yawNow);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      if (visible && !reduce && !document.hidden) rafId = requestAnimationFrame(draw);
+      else rafId = 0;
+    }
+    function loop() { if (!rafId) rafId = requestAnimationFrame(draw); }
+
+    gl.clearColor(0, 0, 0, 0);
+    draw(performance.now());
+    canvas.classList.add('is-live');
+
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(function (entries) {
+        visible = entries[0].isIntersecting;
+        if (visible) loop();
+      }, { threshold: 0.05 }).observe(canvas);
+    } else { visible = true; loop(); }
+    document.addEventListener('visibilitychange', function () { if (!document.hidden && visible) loop(); });
+  }
+
+  function boot() {
+    var c = document.querySelector('canvas.cake3d[data-cake="chocolate"]');
+    if (c) { try { init(c); } catch (e) { /* section stays usable without 3D */ } }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
