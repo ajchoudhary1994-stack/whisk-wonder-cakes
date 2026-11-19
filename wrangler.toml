@@ -1,0 +1,11 @@
+# Cloudflare Pages project. Only the "site" folder is published.
+name = "whisk-and-wonder-cakes"
+pages_build_output_dir = "site"
+compatibility_date = "2026-01-01"
+
+# Rewards database (orders, reward codes, rate limits).
+[[d1_databases]]
+binding = "DB"
+database_name = "whisk-wonder-rewards"
+database_id = "c849d7d9-8954-4845-9ba0-afb66742e3c2"
+migrations_dir = "migrations"
