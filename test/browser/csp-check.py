@@ -3,7 +3,7 @@ import re, sys, json, threading, http.server, socketserver, functools, os
 from playwright.sync_api import sync_playwright
 
 SITE = sys.argv[1]           # path to the site/ folder
-PAGES = sys.argv[2:] or ["index.html", "privacy.html"]
+PAGES = sys.argv[2:] or ["index.html", "privacy"]
 
 headers_txt = open(os.path.join(SITE, "_headers"), encoding="utf-8").read()
 csp = re.search(r"Content-Security-Policy:\s*(.+)", headers_txt).group(1).strip()
