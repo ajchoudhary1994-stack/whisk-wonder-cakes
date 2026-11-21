@@ -4,9 +4,9 @@ Hosted on **Cloudflare Pages** (free). The site is plain files in `site/`. One s
 
 - `site/` is the website that visitors get. Cloudflare publishes only this folder.
 - `functions/api/rewards.js` is the only server code: orders, owner payment confirmation, feedback and reward codes.
-  It runs at `/api/rewards` and keeps data in a Cloudflare D1 database (the table is created automatically).
+  It runs at `/api/rewards` and keeps data in a Cloudflare D1 database. The `kv` table is created automatically on first use; migration `0002_create_kv_store.sql` is also provided for managed schema setup.
 - `test/` has the automated checks. Run `npm test` (needs Node 22 or newer).
-- `source/` and `build.sh` rebuild the motion/3D scripts. Not needed to deploy.
+- `source/` holds the unminified motion/3D scripts. The `build.sh` mentioned in older notes is not in this ZIP, so edit `site/js/` directly. Not needed to deploy.
 
 Setup steps are in **CLOUDFLARE-DEPLOY.md**.
 
@@ -33,4 +33,5 @@ Setup steps are in **CLOUDFLARE-DEPLOY.md**.
 
 - Orders, feedback and reward codes stay in D1 with no end date. Decide how long to keep them.
 - Rate limits are per client IP per hour, stored in D1. Cloudflare's free bot and rate protection can sit in front for more.
+- Set `NTFY_TOKEN` whenever `NTFY_TOPIC` is enabled. Without it, anyone who knows the topic name may be able to read alerts containing owner confirmation links.
 - Address, time slot, cake message and notes are now saved with the order on the server and shown on the owner page and email. (They used to go to Netlify Forms.)

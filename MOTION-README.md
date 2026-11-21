@@ -11,4 +11,4 @@ To remove a piece, delete its `<script>` / `<link>` line in `index.html` and the
 Test after deploying on a phone: scroll the whole page, drag the cake, open the cart,
 open a gallery photo (page must not scroll behind it), tap menu links (they glide to the section).
 
-Build: edit files in `source/`, then run `./build.sh` (needs esbuild). `source/` is not published; only `site/` is.
+Build: `build.sh` is not included in this ZIP, so edit the files in `site/js/` directly (the `source/` copies are for reference). `source/` is not published; only `site/` is.
