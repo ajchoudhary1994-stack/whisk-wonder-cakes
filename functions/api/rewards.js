@@ -27,26 +27,43 @@ let SECRET = "";
 let RL_ORDERS = 20;   // orders per IP per hour
 let RL_OTHER = 120;   // other API calls per IP per hour
 let RL_CHECK = 15;    // reward code checks per IP per hour (stops guessing)
+const RL_MAIL = 3;    // customer emails per email address per hour
 function configure(env) {
   ENV = env || {};
-  AMOUNT = Number(ENV.REWARD_AMOUNT || 50);
+  const configuredAmount = Number(ENV.REWARD_AMOUNT || 50);
+  AMOUNT = Number.isSafeInteger(configuredAmount) && configuredAmount > 0 && configuredAmount <= MAX_TOTAL ? configuredAmount : 50;
   SITE = (ENV.SITE_URL || "https://www.whiskandwondercakes.in").replace(/\/$/, "");
   SECRET = ENV.REWARDS_SECRET || "";
-  RL_ORDERS = Number(ENV.RATE_LIMIT_ORDERS || 20);
-  RL_OTHER = Number(ENV.RATE_LIMIT_OTHER || 120);
-  RL_CHECK = Number(ENV.RATE_LIMIT_CHECK || 15);
+  const limit = (value, fallback) => Number.isSafeInteger(Number(value)) && Number(value) >= 1 && Number(value) <= 10000 ? Number(value) : fallback;
+  RL_ORDERS = limit(ENV.RATE_LIMIT_ORDERS, 20);
+  RL_OTHER = limit(ENV.RATE_LIMIT_OTHER, 120);
+  RL_CHECK = limit(ENV.RATE_LIMIT_CHECK, 15);
 }
 const ORDER_RE = /^ORD-[A-Z2-9]{6}$/;
 const CODE_RE = /^RWD-[A-Z2-9]{6}$/;
 const MAX_TOTAL = 200000; // rupees: sanity cap for one order
 
-const JSON_HEADERS = { "Content-Type": "application/json", "Cache-Control": "no-store" };
+const JSON_HEADERS = {
+  "Content-Type": "application/json; charset=utf-8",
+  "Cache-Control": "no-store",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "no-referrer",
+  "X-Frame-Options": "DENY",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+};
+const PAGE_HEADERS = {
+  "Content-Type": "text/html; charset=utf-8",
+  "Cache-Control": "no-store",
+  "X-Robots-Tag": "noindex, nofollow",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "no-referrer",
+  "X-Frame-Options": "DENY",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  // The confirmation page contains only inline presentation styles and a same-origin POST form.
+  "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+};
 const json = (statusCode, body) => ({ statusCode, headers: JSON_HEADERS, body: JSON.stringify(body) });
-const page = (statusCode, body) => ({
-  statusCode,
-  headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex" },
-  body,
-});
+const page = (statusCode, body) => ({ statusCode, headers: PAGE_HEADERS, body });
 
 // Storage: one D1 table (k, v, etag, t). The table is created on first use.
 // setJSON keeps the old options: onlyIfNew and onlyIfMatch (etag). Both are single SQL statements, so two
@@ -79,6 +96,9 @@ async function store() {
       }
       await d.prepare("INSERT INTO kv (k, v, etag, t) VALUES (?, ?, 1, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v, etag = kv.etag + 1, t = excluded.t").bind(k, v, t).run();
       return { modified: true };
+    },
+    async delete(k) {
+      return changed(await d.prepare("DELETE FROM kv WHERE k = ?").bind(k).run());
     },
     async purgeRateLimits(olderThanMs) {
       await d.prepare("DELETE FROM kv WHERE k LIKE 'rl:%' AND t < ?").bind(Date.now() - olderThanMs).run();
@@ -217,10 +237,29 @@ async function tokenOk(kind, id, token) {
 const feedbackUrl = async (id) => `${SITE}/?feedback=${id}&t=${await sign("feedback", id)}`;
 const confirmUrl = async (id) => `${SITE}/api/rewards?action=confirm&id=${id}&s=${await sign("confirm", id)}`;
 
+// Outbound calls (Brevo, ntfy) must never hold up an order: 5 s timeout, one retry after a short pause on a network error or a 5xx.
+async function fetchWithRetry(url, opts) {
+  const ms = Math.max(50, Number(ENV.FETCH_TIMEOUT_MS) || 5000);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), ms);
+    try {
+      const res = await fetch(url, { ...opts, signal: ctl.signal });
+      if (res.status < 500 || attempt === 1) return res;
+    } catch (e) {
+      if (attempt === 1) throw e;
+    } finally { clearTimeout(timer); }
+    await new Promise((r) => setTimeout(r, 300));
+  }
+}
+
+// One JSON line per business event, with no names, phones, emails or addresses (safe to keep in Cloudflare logs).
+const logEvent = (evt, data) => console.log(JSON.stringify({ evt, ...data }));
+
 async function sendEmail(to, name, subject, html) {
   if (!to || !ENV.BREVO_API_KEY || !ENV.BREVO_SENDER_EMAIL) return;
   try {
-    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+    const res = await fetchWithRetry("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
       headers: { "api-key": ENV.BREVO_API_KEY, "Content-Type": "application/json", accept: "application/json" },
       body: JSON.stringify({
@@ -230,9 +269,9 @@ async function sendEmail(to, name, subject, html) {
         htmlContent: html,
       }),
     });
-    if (!res.ok) console.log("BREVO ERROR status", res.status); // no body or address in logs
+    if (!res.ok) logEvent("email_failed", { status: res.status }); // no body or address in logs
     else console.log("BREVO OK", subject);
-  } catch (e) { console.log("BREVO EXCEPTION", e && e.name); }
+  } catch (e) { logEvent("email_failed", { error: e && e.name }); }
 }
 
 function ownerOrderEmail(order, link) {
@@ -292,15 +331,24 @@ ${balance > 0 ? `<p>The remaining <b>Rs ${balance}</b> is paid on delivery or pi
 // The ntfy alert has no customer name or phone. Those are only in the owner email.
 async function notifyOwner(order, link) {
   if (!ENV.NTFY_TOPIC) return;
-  const headers = { Title: "New order " + order.id, Priority: "high", Click: link };
-  if (ENV.NTFY_TOKEN) headers.Authorization = "Bearer " + ENV.NTFY_TOKEN;
+  // The confirm link is a bearer credential. Without NTFY_TOKEN the topic is readable by anyone who learns its name,
+  // so the link is NOT put in the alert. The owner email still carries it.
+  const headers = { Title: "New order " + order.id, Priority: "high" };
+  let hint = "Open the alert to review and confirm payment.";
+  if (ENV.NTFY_TOKEN) {
+    headers.Authorization = "Bearer " + ENV.NTFY_TOKEN;
+    headers.Click = link;
+  } else {
+    hint = "Confirm link is in the owner email. Set NTFY_TOKEN to get it here.";
+    console.warn("NTFY_TOPIC is set without NTFY_TOKEN: confirm link left out of the ntfy alert");
+  }
   try {
-    await fetch(`https://ntfy.sh/${encodeURIComponent(ENV.NTFY_TOPIC)}`, {
+    await fetchWithRetry(`https://ntfy.sh/${encodeURIComponent(ENV.NTFY_TOPIC)}`, {
       method: "POST",
       headers,
-      body: `Order ${order.id} | Rs ${order.total} | ${order.date || "-"}\n${order.cakes || ""}\nOpen the alert to review and confirm payment.`,
+      body: `Order ${order.id} | Rs ${order.total} | ${order.date || "-"}\n${order.cakes || ""}\n${hint}`,
     });
-  } catch (e) { /* alert failed, the order is still saved */ }
+  } catch (e) { logEvent("ntfy_failed", { error: e && e.name }); /* alert failed, the order is still saved */ }
 }
 
 // ---------- Owner confirm pages ----------
@@ -368,16 +416,26 @@ async function confirmSubmit(idRaw, s) {
     return page(403, pageShell("Link not valid", "<p>This confirm link is not valid.</p>"));
   }
   const db = await store();
-  const order = await db.get("order:" + id);
-  if (!order) return page(404, pageShell("Not found", "<p>Order not found.</p>"));
+  const found = await db.getWithMetadata("order:" + id);
+  if (!found) return page(404, pageShell("Not found", "<p>Order not found.</p>"));
 
+  let order = found.data;
   let justConfirmed = false;
   if (order.status !== "paid") {
-    order.status = "paid";
-    order.paidAt = now();
-    await db.setJSON("order:" + id, order);
-    justConfirmed = true;
-    await sendEmail(order.email, order.name, "Payment received for order " + id, paymentConfirmedEmail(order));
+    const paidOrder = { ...order, status: "paid", paidAt: now() };
+    const saved = await db.setJSON("order:" + id, paidOrder, { onlyIfMatch: found.etag });
+    if (saved && saved.modified) {
+      order = paidOrder;
+      logEvent("order_paid", { id });
+      justConfirmed = true;
+      await sendEmail(order.email, order.name, "Payment received for order " + id, paymentConfirmedEmail(order));
+    } else {
+      // Another click won the race. Reload and never send a second payment-confirmation email.
+      order = await db.get("order:" + id);
+      if (!order || order.status !== "paid") {
+        return page(409, pageShell("Please retry", "<p>This order changed while you were confirming it. Please reload this page.</p>"));
+      }
+    }
   }
   return page(200, await confirmPageHtml(id, s, order, justConfirmed));
 }
@@ -388,7 +446,8 @@ async function confirmSubmit(idRaw, s) {
 // The IP is hashed with the secret before it is stored, so no raw IP addresses are kept.
 async function clientKey(event) {
   const h = event.headers || {};
-  const ip = String(h["cf-connecting-ip"] || h["x-forwarded-for"] || "unknown").split(",")[0].trim().slice(0, 64);
+  // CF-Connecting-IP is set by Cloudflare at the edge. Do not trust client-controlled X-Forwarded-For.
+  const ip = String(h["cf-connecting-ip"] || h["CF-Connecting-IP"] || "unknown").trim().slice(0, 64);
   return (await hmacHex(SECRET, ip)).slice(0, 32);
 }
 
@@ -447,6 +506,7 @@ const handle = async (event) => {
     : ["api", RL_OTHER];
   const allowed = await allowRequest(db, limit[0], limit[1], clientId);
   if (!allowed) {
+    logEvent("rate_limited", { bucket: limit[0] });
     return json(429, { ok: false, message: "Too many requests. Please wait a while and try again, or message us on WhatsApp." });
   }
 
@@ -488,6 +548,9 @@ const handle = async (event) => {
       }
 
       const payable = Math.max(0, cakeTotal - discount) + delivery;
+      if (!Number.isSafeInteger(payable) || payable > MAX_TOTAL) {
+        return json(400, { ok: false, message: "This order is above the online order limit. Please contact us on WhatsApp." });
+      }
       if (payable !== money(b.total)) {
         return json(200, { ok: false, message: "Prices have changed or the total did not match. Please refresh the page and try again." });
       }
@@ -511,11 +574,32 @@ const handle = async (event) => {
         date: clean(b.date, 20), payment: clean(b.payment, 80), createdAt: now(),
         address: clean(b.address, 300), slot: clean(b.slot, 60), message: clean(b.message, 120), notes: clean(b.notes, 300),
       };
-      await db.setJSON("order:" + id, order);
+      try {
+        await db.setJSON("order:" + id, order);
+      } catch (err) {
+        // The order was not saved, so give the reward code back (only if this request had just used it).
+        if (codeFound && codeFound.data.status === "unused") {
+          try {
+            const cur = await db.getWithMetadata(codeKey);
+            if (cur && cur.data && cur.data.status === "used" && cur.data.orderId === id) {
+              await db.setJSON(codeKey, { ...codeFound.data }, { onlyIfMatch: cur.etag });
+            }
+          } catch (e) { /* best effort */ }
+        }
+        throw err;
+      }
+      logEvent("order_created", { id, total: payable, discount, items: order.items ? order.items.length : undefined });
       const link = await confirmUrl(id);
       await notifyOwner(order, link);
       await sendEmail(ENV.OWNER_EMAIL, "Owner", "New order " + id + " from " + order.name, ownerOrderEmail(order, link));
-      await sendEmail(order.email, order.name, "Order " + id + " received", orderReceivedEmail(order));
+      // The customer email goes to whatever address was typed, so cap it per address. Otherwise the order form
+      // could be used to send unwanted mail to someone else's inbox. The order itself is saved either way.
+      if (order.email) {
+        const mailKey = (await hmacHex(SECRET, "mail:" + order.email.toLowerCase())).slice(0, 32);
+        if (await allowRequest(db, "mail", RL_MAIL, mailKey)) {
+          await sendEmail(order.email, order.name, "Order " + id + " received", orderReceivedEmail(order));
+        }
+      }
       return json(200, { ok: true, total: payable, discount });
     }
 
@@ -536,28 +620,45 @@ const handle = async (event) => {
     case "feedbackSubmit": {
       const id = normOrder(b.orderId);
       if (!ORDER_RE.test(id) || !(await tokenOk("feedback", id, b.token))) return json(200, { ok: false, message: "This feedback link is not valid." });
-      const order = await db.get("order:" + id);
-      if (!order || order.status !== "paid") return json(200, { ok: false, message: "Your order is not confirmed yet." });
-      if (order.rewardCode) return json(200, { ok: true, code: order.rewardCode, existing: true });
+      const found = await db.getWithMetadata("order:" + id);
+      if (!found || found.data.status !== "paid") return json(200, { ok: false, message: "Your order is not confirmed yet." });
+      if (found.data.rewardCode) return json(200, { ok: true, code: found.data.rewardCode, existing: true });
 
       const rating = Number(b.rating);
-      if (!(rating >= 1 && rating <= 5)) return json(200, { ok: false, message: "Please select a star rating." });
+      if (!(Number.isInteger(rating) && rating >= 1 && rating <= 5)) return json(200, { ok: false, message: "Please select a star rating." });
 
-      const code = makeCode();
-      await db.setJSON("code:" + code, { status: "unused", orderId: id, phone: order.phone, amount: AMOUNT, createdAt: now() });
-      await db.setJSON("order:" + id, {
+      // Reserve a unique code, then atomically claim the order using its etag.
+      // If another request wins, discard this unused code and return the winner's code.
+      let code = "", reserved = false;
+      for (let attempt = 0; attempt < 5 && !reserved; attempt++) {
+        code = makeCode();
+        const reservation = await db.setJSON("code:" + code, { status: "unused", orderId: id, phone: found.data.phone, amount: AMOUNT, createdAt: now() }, { onlyIfNew: true });
+        reserved = !!(reservation && reservation.modified);
+      }
+      if (!reserved) return json(503, { ok: false, message: "We could not issue your reward right now. Please try again." });
+
+      const order = found.data;
+      const updatedOrder = {
         ...order,
         rewardCode: code,
         feedback: {
           rating, text: clean(b.feedback, 1000), occasion: clean(b.occasion, 80), date: clean(b.date, 20),
           recipient: clean(b.recipient, 60), relation: clean(b.relation, 60), submittedAt: now(),
         },
-      });
+      };
+      const saved = await db.setJSON("order:" + id, updatedOrder, { onlyIfMatch: found.etag });
+      if (!saved || !saved.modified) {
+        await db.delete("code:" + code);
+        const latest = await db.get("order:" + id);
+        if (latest && latest.rewardCode) return json(200, { ok: true, code: latest.rewardCode, existing: true });
+        return json(409, { ok: false, message: "Your order changed while submitting feedback. Please try again." });
+      }
+
       await sendEmail(ENV.OWNER_EMAIL, "Owner", "Feedback for order " + id + " (" + rating + " stars)",
         `<div style="font-family:Arial,sans-serif;color:#3b2a24;line-height:1.5"><h2 style="margin:0 0 .4rem">Feedback for order ${esc(id)}</h2><ul><li><b>Name:</b> ${esc(order.name)}</li><li><b>Rating:</b> ${esc(rating)} of 5</li><li><b>Occasion:</b> ${esc(clean(b.occasion, 80) || "-")}</li><li><b>Feedback:</b> ${esc(clean(b.feedback, 1000) || "-")}</li><li><b>Reward code issued:</b> ${esc(code)}</li></ul></div>`);
+      logEvent("reward_issued", { id });
       return json(200, { ok: true, code });
     }
-
     /* Checkout: is this reward code usable? (read only) */
     case "check": {
       const code = normCode(b.code);
@@ -596,6 +697,27 @@ export async function handler(event, env) {
 
 const MAX_BODY = 65536; // bytes. An order is a few KB.
 
+async function readBodyLimited(request, maxBytes) {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks = [];
+  let total = 0;
+  while (true) {
+    const part = await reader.read();
+    if (part.done) break;
+    total += part.value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new Error("REQUEST_BODY_TOO_LARGE");
+    }
+    chunks.push(part.value);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  return new TextDecoder().decode(bytes);
+}
+
 export async function onRequest(context) {
   const { request, env } = context;
   const url = new URL(request.url);
@@ -604,8 +726,16 @@ export async function onRequest(context) {
   let body = "";
   if (request.method === "POST") {
     if (Number(headers["content-length"] || 0) > MAX_BODY) return new Response('{"ok":false,"message":"Request too large"}', { status: 413, headers: JSON_HEADERS });
-    body = await request.text();
-    if (body.length > MAX_BODY) return new Response('{"ok":false,"message":"Request too large"}', { status: 413, headers: JSON_HEADERS });
+    const contentType = String(headers["content-type"] || "").toLowerCase();
+    if (!contentType.includes("application/json") && !contentType.includes("application/x-www-form-urlencoded")) {
+      return new Response('{"ok":false,"message":"Unsupported content type"}', { status: 415, headers: JSON_HEADERS });
+    }
+    try {
+      body = await readBodyLimited(request, MAX_BODY);
+    } catch (err) {
+      if (err && err.message === "REQUEST_BODY_TOO_LARGE") return new Response('{"ok":false,"message":"Request too large"}', { status: 413, headers: JSON_HEADERS });
+      throw err;
+    }
   }
   const res = await handler({ httpMethod: request.method, headers, body, queryStringParameters: Object.fromEntries(url.searchParams) }, env);
   return new Response(res.body, { status: res.statusCode, headers: res.headers });
