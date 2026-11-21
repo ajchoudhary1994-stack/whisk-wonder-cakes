@@ -1,3 +1,5 @@
+-- LEGACY. The running function does NOT use these three tables; it uses the single `kv` table (see 0002).
+-- They are kept only so databases that already applied this file stay valid. New setups can ignore this file's tables.
 -- Whisk & Wonder rewards store (Cloudflare D1).
 CREATE TABLE IF NOT EXISTS orders (
   id         TEXT PRIMARY KEY,
