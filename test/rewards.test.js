@@ -142,6 +142,15 @@ const ok = (name) => { pass++; console.log("PASS", name); };
   assert.strictEqual(r.ok, false);
   ok("empty cart is rejected");
 
+  // Server-side order cap must be enforced even when the browser sends a matching total.
+  r = parse(await post({ action: "createOrder", orderId: "ORD-CAPAAA", phone: "9459755408", items: [
+    { id: "red-velvet", size: "10 lb (5 kg)", qty: 20 },
+    { id: "red-velvet", size: "10 lb (5 kg)", qty: 20 },
+  ], delivery: 0, total: 230000 }));
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(exists("order:ORD-CAPAAA"), false);
+  ok("server rejects payable totals above MAX_TOTAL even when the client total matches");
+
   // ---- Reward rules ----
   seedCode("RWD-BBBBBB", "ORD-SEED01");
   r = parse(await post({ action: "createOrder", orderId: "ORD-KKKKKK", phone: "9459755408", items: CART, delivery: 0, total: 1275, rewardCode: "RWD-BBBBBB" }));
@@ -198,6 +207,18 @@ const ok = (name) => { pass++; console.log("PASS", name); };
   assert.ok(res.body.includes("wa.me/919459755408"));
   assert.ok(res.body.includes(encodeURIComponent("https://www.whiskandwondercakes.in/?feedback=" + id + "&t=" + sign("feedback", id))), "WhatsApp message must carry the real signed feedback link");
   ok("owner button marks the order paid and shows the feedback WhatsApp link");
+  assert.strictEqual(res.headers["Referrer-Policy"], "no-referrer");
+  assert.ok(res.headers["Content-Security-Policy"].includes("frame-ancestors 'none'"));
+
+  // Concurrent owner clicks must only transition pending -> paid once.
+  await (await _security.store()).setJSON("order:ORD-PAYRAC", { id: "ORD-PAYRAC", status: "pending", name: "Race", phone: "9459755408", total: 575 });
+  const payRace = await Promise.all([
+    form({ do: "confirm", id: "ORD-PAYRAC", s: sign("confirm", "ORD-PAYRAC") }),
+    form({ do: "confirm", id: "ORD-PAYRAC", s: sign("confirm", "ORD-PAYRAC") }),
+  ]);
+  assert.ok(payRace.every((x) => x.statusCode === 200));
+  assert.strictEqual(stored("order:ORD-PAYRAC").status, "paid");
+  ok("two simultaneous owner confirmations result in one atomic payment-state transition");
 
   // ---- Feedback: one code per paid order ----
   const fbT = sign("feedback", id);
@@ -209,6 +230,18 @@ const ok = (name) => { pass++; console.log("PASS", name); };
   r = parse(await post({ action: "feedbackSubmit", orderId: id, token: fbT, rating: 5 }));
   assert.strictEqual(r.existing, true);
   ok("feedback issues exactly one reward code per paid order");
+
+  // Concurrent feedback submissions must not issue two reward codes for one paid order.
+  await (await _security.store()).setJSON("order:ORD-FBRACE", { id: "ORD-FBRACE", status: "paid", name: "Race", phone: "9459755408" });
+  const fbRace = await Promise.all([
+    post({ action: "feedbackSubmit", orderId: "ORD-FBRACE", token: sign("feedback", "ORD-FBRACE"), rating: 5, feedback: "First" }),
+    post({ action: "feedbackSubmit", orderId: "ORD-FBRACE", token: sign("feedback", "ORD-FBRACE"), rating: 4, feedback: "Second" }),
+  ]);
+  const fbResults = fbRace.map(parse);
+  assert.ok(fbResults.every((x) => x.ok), JSON.stringify(fbResults));
+  assert.strictEqual(fbResults[0].code, fbResults[1].code, "both requests must return the same winning code");
+  assert.strictEqual(sqlite.prepare("SELECT COUNT(*) AS n FROM kv WHERE k LIKE 'code:RWD-%' AND json_extract(v, '$.orderId') = 'ORD-FBRACE'").get().n, 1);
+  ok("two simultaneous feedback submissions for one paid order issue exactly one reward code");
 
   // ---- Email validation: bad addresses are stored without an email, so nothing is sent ----
   assert.strictEqual(_security.cleanEmail("a@b.co"), "a@b.co");
@@ -282,7 +315,7 @@ const ok = (name) => { pass++; console.log("PASS", name); };
   const calls = [];
   const realFetch = globalThis.fetch;
   globalThis.fetch = async (url, opts) => { calls.push({ url: String(url), opts }); return { ok: true, status: 200 }; };
-  const ENVN = { ...ENVV, OWNER_EMAIL: "owner@example.in", BREVO_API_KEY: "k", BREVO_SENDER_EMAIL: "s@example.in", NTFY_TOPIC: "topic-123" };
+  const ENVN = { ...ENVV, OWNER_EMAIL: "owner@example.in", BREVO_API_KEY: "k", BREVO_SENDER_EMAIL: "s@example.in", NTFY_TOPIC: "topic-123", NTFY_TOKEN: "tk_test" };
   try {
     r = parse(await handler({ httpMethod: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "createOrder", orderId: "ORD-SSSSSS", phone: "9459755408", name: "Asha", items: [{ id: "vanilla", size: "1 lb (500 g)", qty: 1 }], delivery: 0, total: 375, address: "Arla Palampur" }) }, ENVN));
   } finally { globalThis.fetch = realFetch; }
@@ -292,7 +325,61 @@ const ok = (name) => { pass++; console.log("PASS", name); };
   assert.ok(nt && nt.opts.headers.Click === link, "ntfy alert must open the signed confirm link");
   const em = calls.find((c) => c.url.includes("brevo"));
   assert.ok(em && em.opts.body.includes("api/rewards?action=confirm") && em.opts.body.includes("Arla Palampur"), "owner email has the link and the address");
+  assert.strictEqual(nt.opts.headers.Authorization, "Bearer tk_test");
   ok("owner gets an ntfy alert and an email with the signed confirm link and the delivery address");
+
+  // ---- ntfy topic WITHOUT a token: the bearer confirm link must not be published to the topic ----
+  {
+    const nc = [];
+    const rf2 = globalThis.fetch;
+    globalThis.fetch = async (url, opts) => { nc.push({ url: String(url), opts }); return { ok: true, status: 200 }; };
+    try {
+      const res = parse(await handler({ httpMethod: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "createOrder", orderId: "ORD-NTFYAA", phone: "9459755408", items: [{ id: "vanilla", size: "1 lb (500 g)", qty: 1 }], delivery: 0, total: 375 }) }, { ...ENVV, NTFY_TOPIC: "topic-123" }));
+      assert.strictEqual(res.ok, true, res.message);
+    } finally { globalThis.fetch = rf2; }
+    const n2 = nc.find((c) => c.url.includes("ntfy.sh"));
+    assert.ok(n2, "alert is still sent");
+    assert.ok(!n2.opts.headers.Click && !String(n2.opts.body).includes("s="), "no confirm link without NTFY_TOKEN");
+    ok("ntfy without NTFY_TOKEN: alert is sent but the signed confirm link is left out");
+  }
+
+  // ---- Customer emails are capped per address, so the form cannot be used to mail-bomb someone ----
+  {
+    const mailCalls = [];
+    const rf = globalThis.fetch;
+    globalThis.fetch = async (url, opts) => { mailCalls.push({ url: String(url), opts }); return { ok: true, status: 200 }; };
+    const ENVM = { ...ENVV, BREVO_API_KEY: "k", BREVO_SENDER_EMAIL: "s@example.in" };
+    try {
+      for (const oid of ["ORD-MAILA2", "ORD-MAILB2", "ORD-MAILC2", "ORD-MAILD2", "ORD-MAILE2"]) {
+        const res = parse(await handler({ httpMethod: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "createOrder", orderId: oid, phone: "9459755408", name: "Victim Test", email: "victim@example.in", items: [{ id: "vanilla", size: "1 lb (500 g)", qty: 1 }], delivery: 0, total: 375 }) }, ENVM));
+        assert.strictEqual(res.ok, true, res.message);
+        assert.strictEqual(exists("order:" + oid), true, "the order is still saved when the email is skipped");
+      }
+    } finally { globalThis.fetch = rf; }
+    const toVictim = mailCalls.filter((c) => c.opts && String(c.opts.body).includes("victim@example.in"));
+    assert.strictEqual(toVictim.length, 3, "only 3 emails per address per hour: got " + toVictim.length);
+    ok("order emails to one address are capped at 3 per hour; the orders themselves are still saved");
+  }
+
+  // ---- A hung email/alert service must not hold up an order: timeout, one retry, order still saved ----
+  {
+    const rf3 = globalThis.fetch;
+    let hung = 0;
+    globalThis.fetch = (url, opts) => new Promise((_, reject) => {
+      hung++;
+      opts.signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
+    });
+    const started = Date.now();
+    let res;
+    try {
+      res = parse(await handler({ httpMethod: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "createOrder", orderId: "ORD-HUNGAA", phone: "9459755408", items: [{ id: "vanilla", size: "1 lb (500 g)", qty: 1 }], delivery: 0, total: 375 }) }, { ...ENVV, NTFY_TOPIC: "t", NTFY_TOKEN: "k", BREVO_API_KEY: "k", BREVO_SENDER_EMAIL: "s@example.in", OWNER_EMAIL: "o@example.in", FETCH_TIMEOUT_MS: "60" }));
+    } finally { globalThis.fetch = rf3; }
+    assert.strictEqual(res.ok, true, res.message);
+    assert.ok(Date.now() - started < 3000, "order must return quickly even if third parties hang");
+    assert.ok(hung >= 2, "each outbound call is retried once: " + hung);
+    assert.strictEqual(exists("order:ORD-HUNGAA"), true, "the order is saved");
+    ok("hung ntfy/Brevo calls time out and retry once; the order is still saved and returned quickly");
+  }
 
   // ---- Cloudflare entry point: real Request and Response objects ----
   const viaCf = async (method, body, env = ENVV) => mod.onRequest({ request: new Request("https://example.in/api/rewards", { method, body, headers: { "content-type": "application/json" } }), env });
@@ -309,7 +396,11 @@ const ok = (name) => { pass++; console.log("PASS", name); };
   assert.ok(/Something went wrong/.test(msg) && !/DB binding|at .*\.js/.test(msg), "missing database gives a clean message, no internals");
   cf = await viaCf("POST", JSON.stringify({ action: "check", code: "RWD-AAAAAA" }), { DB: d1 });
   assert.strictEqual(cf.status, 500, "missing REWARDS_SECRET is refused");
-  ok("Cloudflare entry point: normal call, 413 for a huge body, 404 for a bare GET, clean 500 for a missing database or secret");
+  const wrongType = await mod.onRequest({ request: new Request("https://example.com/api/rewards", { method: "POST", headers: { "content-type": "text/plain" }, body: "{}" }), env: ENVV });
+  assert.strictEqual(wrongType.status, 415);
+  const unicodeTooLarge = await mod.onRequest({ request: new Request("https://example.com/api/rewards", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ x: "क".repeat(30000) }) }), env: ENVV });
+  assert.strictEqual(unicodeTooLarge.status, 413);
+  ok("Cloudflare entry point: normal call, byte-based 413, content-type enforcement, 404 for bare GET, clean 500 for missing DB or secret");
 
   console.log(`\nAll ${pass} checks passed.`);
 })().catch((e) => { console.error("FAIL:", e.message); process.exit(1); });
