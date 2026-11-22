@@ -10,7 +10,7 @@
 
 **Secret rotation.** Change `REWARDS_SECRET` (Pages > Settings > Variables and secrets, then redeploy) if it leaks. Old confirm and feedback links stop working, so only do it with no orders waiting for payment confirmation. Rotate `BREVO_API_KEY` and `NTFY_TOKEN` in their own dashboards, update them in Cloudflare, redeploy.
 
-**Cache.** Images, video and fonts are cached by browsers for up to 30 days (fonts 1 year). If you replace a photo, save it under a new file name, or visitors may keep seeing the old one.
+**Optional setting.** `CONFIRM_TTL_DAYS` (default 30): how many days an owner confirm link works for an order that is still unpaid.
 
 **Customer data.** Orders keep name, phone, optional email and address. Decide how long you need them (for example 12 months), and delete older orders from D1 on request or on a schedule. India's DPDP Act 2023 expects you to keep personal data only as long as needed.
 
