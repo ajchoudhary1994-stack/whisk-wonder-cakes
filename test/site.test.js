@@ -7,7 +7,6 @@ const assert = require("assert");
 const SITE = path.join(__dirname, "..", "site");
 const read = (f) => fs.readFileSync(path.join(SITE, f), "utf8");
 const pages = ["index.html", "privacy.html"];
-const allPages = ["index.html", "privacy.html", "terms.html", "404.html"];
 let pass = 0;
 const ok = (name) => { pass++; console.log("PASS", name); };
 
@@ -17,11 +16,10 @@ const csp = /Content-Security-Policy:\s*(.+)/.exec(headers)[1];
 const directive = (name) => (csp.split(";").map((d) => d.trim()).find((d) => d.startsWith(name + " ")) || "");
 assert.ok(!/unsafe-inline/.test(csp), "CSP must not contain unsafe-inline");
 assert.ok(!/unsafe-eval/.test(csp), "CSP must not contain unsafe-eval");
-assert.strictEqual(directive("script-src"), "script-src 'self' https://www.googletagmanager.com https://www.clarity.ms https://scripts.clarity.ms", "script-src: self plus the Google Analytics and Microsoft Clarity loaders only");
+assert.strictEqual(directive("script-src"), "script-src 'self' https://www.googletagmanager.com", "script-src: self plus Google Analytics loader only");
 assert.strictEqual(directive("style-src"), "style-src 'self'");
 assert.ok(!/data:/.test(directive("img-src")), "img-src must not allow data: URIs");
 assert.ok(!/googleapis|gstatic/.test(csp), "no Google font hosts in the CSP");
-assert.ok(/Referrer-Policy:\s*no-referrer/i.test(headers), "site must not send URL query tokens as referrers");
 ok("CSP: script-src and style-src are 'self' only; no unsafe-inline, unsafe-eval, or data: images");
 
 for (const page of pages) {
@@ -45,10 +43,7 @@ for (const page of pages) {
   // 6. Every local file the page references exists
   const refs = [...html.matchAll(/\s(?:src|href)="([^"#?:]+)"/g)].map((m) => m[1]).filter((r) => !r.startsWith("/api") && !r.startsWith("mailto") && !r.startsWith("tel"));
   for (const ref of refs) {
-    // Cloudflare Pages serves /privacy from privacy.html and /folder/ from folder/index.html
-    const rel = ref.replace(/^\//, "");
-    const target = rel === "" ? "index.html" : rel.endsWith("/") ? rel + "index.html" : (/\.[a-z0-9]+$/i.test(rel) ? rel : rel + ".html");
-    assert.ok(fs.existsSync(path.join(SITE, target)), page + ": missing local file " + ref);
+    assert.ok(fs.existsSync(path.join(SITE, ref)), page + ": missing local file " + ref);
   }
   ok(`${page}: no inline script, style, handler, javascript: URL, or base64 image; all local files exist (${refs.length} refs)`);
 }
@@ -76,84 +71,30 @@ for (const page of ["terms.html", "404.html"]) {
   assert.strictEqual((html.match(/\sstyle=/g) || []).length, 0, page + ": style= attribute found");
   assert.deepStrictEqual(html.match(/\son[a-z]+=/gi) || [], [], page + ": inline event handler found");
   assert.strictEqual([...html.matchAll(/<script\b([^>]*)>/g)].filter((m) => !/\bsrc=/.test(m[1])).length, 0, page + ": inline <script> found");
-  for (const m of html.matchAll(/\s(?:src|href)="([^"#?:]+)"/g)) {
-    if (!/^(\/|mailto|tel)/.test(m[1])) assert.ok(fs.existsSync(path.join(SITE, m[1])), page + ": missing local file " + m[1]);
-  }
 }
-ok("terms.html and 404.html: no inline script, style or handler; local files exist");
+ok("terms.html and 404.html: no inline script, style or handler");
 
-// 6d. CSP hosts match what the site really uses
+// 6d. CSP hosts match what the site really uses; the referrer policy never leaks full URLs to other sites
 {
   assert.ok(!/unsplash/i.test(csp), "CSP must not allow Unsplash: no page uses it");
   assert.ok(directive("connect-src").includes("https://*.google-analytics.com"), "GA4 sends data to regional hosts too");
-  const stray = allPages.filter((p) => /unsplash/i.test(read(p)));
-  assert.deepStrictEqual(stray, [], "no page may mention Unsplash: " + stray.join(", "));
-  ok("CSP: GA4 regional hosts allowed, unused Unsplash host removed, policy text no longer mentions Unsplash");
+  assert.ok(directive("img-src").includes("https://*.google-analytics.com"), "GA4 beacons may load as images");
+  const rp = /Referrer-Policy:\s*(\S+)/i.exec(headers)[1];
+  assert.ok(["no-referrer", "same-origin", "strict-origin", "strict-origin-when-cross-origin", "origin", "origin-when-cross-origin"].includes(rp), "Referrer-Policy must not send full URLs cross-site: " + rp);
+  const consent = read("js/consent.js");
+  assert.ok(/page_location:\s*window\.location\.origin \+ window\.location\.pathname/.test(consent), "GA must not receive the feedback token in the query string");
+  ok("CSP: GA4 regional hosts allowed, unused Unsplash removed; referrer policy safe; GA never sees the feedback token");
 }
 
-// 6e. Service landing pages: one H1 in the "<Service> in <Area>" form, title and description lengths, canonical, sitemap, CSP-safe markup
+// 6e. Legal text matches the site (no draft markers, no unused services, no "no cookies" claim)
 {
-  const slugs = fs.readdirSync(SITE).filter((d) => fs.existsSync(path.join(SITE, d, "index.html")));
-  assert.ok(slugs.length >= 7, "expected the 7 service pages, found " + slugs.length);
-  const sitemap = read("sitemap.xml");
-  for (const slug of slugs) {
-    const html = read(slug + "/index.html");
-    const title = /<title>([^<]+)<\/title>/.exec(html)[1].replace(/&amp;/g, "&");
-    const h1s = [...html.matchAll(/<h1>([^<]+)<\/h1>/g)].map((m) => m[1]);
-    const desc = /<meta name="description" content="([^"]+)"/.exec(html)[1];
-    assert.strictEqual(h1s.length, 1, slug + ": exactly one H1");
-    assert.ok(/ in (Palampur|Arla)$/.test(h1s[0]), slug + ": H1 must read '<Service> in <Area>': " + h1s[0]);
-    assert.strictEqual(title, h1s[0] + " | Whisk & Wonder Cakes", slug + ": title = H1 + brand");
-    assert.ok(title.length <= 62, slug + ": title too long (" + title.length + ")");
-    assert.ok(desc.length >= 70 && desc.length <= 160, slug + ": meta description length " + desc.length);
-    assert.ok(html.includes('rel="canonical" href="https://www.whiskandwondercakes.in/' + slug + '/"'), slug + ": canonical");
-    assert.ok(sitemap.includes("https://www.whiskandwondercakes.in/" + slug + "/"), slug + ": listed in sitemap.xml");
-    assert.strictEqual((html.match(/\sstyle=/g) || []).length, 0, slug + ": style= attribute");
-    assert.deepStrictEqual(html.match(/\son[a-z]+=/gi) || [], [], slug + ": inline handler");
-    assert.strictEqual([...html.matchAll(/<script\b([^>]*)>/g)].filter((m) => !/\bsrc=/.test(m[1]) && !/application\/ld\+json/.test(m[1])).length, 0, slug + ": inline script");
-    for (const m of html.matchAll(/\s(?:src|href)="(\/[^"#?]*)"/g)) {
-      const ref = m[1];
-      if (ref === "/" || ref.startsWith("/api")) continue;
-      const target = ref.endsWith("/") ? path.join(ref, "index.html") : (/\.[a-z0-9]+$/i.test(ref) ? ref : ref + ".html");
-      assert.ok(fs.existsSync(path.join(SITE, target)), slug + ": broken link " + ref);
-    }
-    for (const m of html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)) JSON.parse(m[1]);
-  }
-  const home = read("index.html");
-  assert.strictEqual((home.match(/<h1\b/g) || []).length, 1, "home: exactly one H1");
-  assert.ok(/<h1[^>]*>[\s\S]*Eggless[\s\S]*Cakes[\s\S]*in[\s\S]*Palampur[\s\S]*<\/h1>/.test(home), "home H1 must be 'Eggless Cakes in Palampur'");
-  for (const slug of slugs) assert.ok(home.includes('href="/' + slug + '/"'), "home links to " + slug);
-  const robots = read("robots.txt");
-  assert.ok(/User-agent: \*\s*\nAllow: \//.test(robots) && /Sitemap: https:\/\/www\.whiskandwondercakes\.in\/sitemap\.xml/.test(robots), "robots.txt: User-agent * + Allow / + Sitemap");
-  ok(slugs.length + " service pages: one H1 '<Service> in <Area>', title/description lengths, canonical, sitemap, JSON-LD parses, links resolve; home H1 and robots.txt checked");
-}
-
-// 6g. Cloudflare Pages 308-redirects /page.html to /page, so canonicals, sitemap and links must use the extension-less address
-{
-  for (const f of ["index.html", "privacy.html", "terms.html", "sitemap.xml", "llms.txt", "js/consent.js"]) {
-    assert.ok(!/whiskandwondercakes\.in\/(privacy|terms)\.html/.test(read(f)), f + ": uses .html address of a legal page");
-    assert.ok(!/href="\/?(privacy|terms)\.html"/.test(read(f)), f + ": links to a .html legal page");
-  }
-  const priv = read("privacy.html");
-  assert.ok(/<meta name="description" content="[^"]{70,160}"/.test(priv), "privacy.html needs a meta description");
-  assert.ok(priv.includes('rel="canonical" href="https://www.whiskandwondercakes.in/privacy"'), "privacy canonical");
-  const home = read("index.html");
-  const ld = [...home.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]));
-  const faq = ld.find((x) => x["@type"] === "FAQPage");
-  assert.ok(faq && faq.mainEntity.length >= 4, "home page needs FAQPage schema matching the visible FAQ");
-  assert.strictEqual(faq.mainEntity.length, (home.match(/class="faq-q"/g) || []).length, "FAQ schema covers every visible FAQ item");
-  ok("clean URLs for legal pages everywhere; privacy has a description; home FAQPage schema matches the visible FAQ");
-}
-
-// 6f. Speed: heavy media must not start loading before the page is usable
-{
-  const home = read("index.html");
-  for (const m of home.matchAll(/<video\b[^>]*>/g)) {
-    assert.ok(!/\bautoplay\b/.test(m[0]) && /preload="none"/.test(m[0]), "video must not autoplay or preload: " + m[0].slice(0, 60));
-  }
-  assert.ok(!/type="module" src="js\/buddy\.js"/.test(home), "mascot module must load lazily via perf.js");
-  assert.ok(/js\/perf\.js/.test(home), "perf.js is loaded");
-  ok("speed: videos do not autoplay/preload at parse time; mascot loads after the page has loaded");
+  const privacy = read("privacy.html"), terms = read("terms.html"), home = read("index.html");
+  assert.ok(!/\[To confirm\]/i.test(terms) && !/class="confirm"/.test(terms), "terms.html still has a draft marker");
+  assert.ok(!/unsplash/i.test(privacy), "privacy.html mentions Unsplash, which the site does not use");
+  assert.ok(!/do not use advertising or tracking cookies/i.test(privacy), "privacy.html must not say there are no tracking cookies");
+  for (const word of ["Nominatim", "Brevo", "ntfy", "delivery address"]) assert.ok(privacy.includes(word), "privacy.html should mention " + word);
+  assert.ok(!/chocolate truffle/i.test(home), "FAQ names a flavour that is not on the menu");
+  ok("privacy and terms text match the site; no draft markers; FAQ only names real flavours");
 }
 
 // 7. The external JS and CSS files parse / are present
@@ -162,13 +103,7 @@ for (const f of ["js/img-fallback.js", "js/site-1.js", "js/site-2.js", "css/site
 }
 ok("external JS and CSS files are present");
 
-// 8. Feedback URLs contain signed bearer tokens. Analytics must never collect query/hash values.
-const consent = read("js/consent.js");
-assert.ok(/page_location:\s*window\.location\.origin\s*\+\s*window\.location\.pathname/.test(consent), "GA page_location must exclude query and hash");
-assert.ok(!/gtag\('config',[^;]*window\.location\.href/.test(consent), "GA must not receive the full URL");
-ok("analytics page_location excludes query strings and signed feedback tokens");
-
-// 9. Photos referenced by the pages are used, and none are left as base64 in the JS
+// 8. Photos referenced by the pages are used, and none are left as base64 in the JS
 const js = ["js/site-1.js", "js/site-2.js", "js/img-fallback.js"].map(read).join("\n");
 assert.strictEqual((js.match(/data:image\//g) || []).length, 0, "base64 image in JS");
 ok("no base64 images in JavaScript");

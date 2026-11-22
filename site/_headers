@@ -5,12 +5,6 @@
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: same-origin
   X-Permitted-Cross-Domain-Policies: none
-  Referrer-Policy: no-referrer
+  Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(self), payment=(), usb=()
-  Content-Security-Policy: default-src 'self'; script-src 'self' https://www.googletagmanager.com https://www.clarity.ms https://scripts.clarity.ms; style-src 'self'; font-src 'self'; img-src 'self' https://*.google-analytics.com https://*.googletagmanager.com https://*.clarity.ms https://c.bing.com; frame-src https://www.openstreetmap.org https://maps.google.com https://www.google.com; connect-src 'self' https://nominatim.openstreetmap.org https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://*.clarity.ms https://c.bing.com; form-action 'self'; base-uri 'self'; object-src 'none'; worker-src 'none'; manifest-src 'self'; frame-ancestors 'none'; upgrade-insecure-requests
-
-/assets/*
-  Cache-Control: public, max-age=2592000
-
-/fonts/*
-  Cache-Control: public, max-age=31536000, immutable
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://www.googletagmanager.com; style-src 'self'; font-src 'self'; img-src 'self' https://*.google-analytics.com https://*.googletagmanager.com; frame-src https://www.openstreetmap.org https://maps.google.com https://www.google.com; connect-src 'self' https://nominatim.openstreetmap.org https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; form-action 'self'; base-uri 'self'; object-src 'none'; worker-src 'none'; manifest-src 'self'; frame-ancestors 'none'; upgrade-insecure-requests

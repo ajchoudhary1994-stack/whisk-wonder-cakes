@@ -402,5 +402,33 @@ const ok = (name) => { pass++; console.log("PASS", name); };
   assert.strictEqual(unicodeTooLarge.status, 413);
   ok("Cloudflare entry point: normal call, byte-based 413, content-type enforcement, 404 for bare GET, clean 500 for missing DB or secret");
 
+  // ---- Cross-site POSTs are refused; same-site and no-Origin calls still work ----
+  {
+    const post = (origin) => mod.onRequest({ request: new Request("https://shop.example.in/api/rewards", { method: "POST", body: JSON.stringify({ action: "check", code: "RWD-NOPE22" }), headers: Object.assign({ "content-type": "application/json" }, origin ? { origin } : {}) }), env: ENVV });
+    assert.strictEqual((await post("https://evil.example.com")).status, 403, "other site must be refused");
+    assert.strictEqual((await post("null")).status, 403, "opaque origin must be refused");
+    assert.strictEqual((await post("https://shop.example.in")).status, 200, "same origin works");
+    assert.strictEqual((await post(undefined)).status, 200, "calls without Origin (server tools) still work");
+    const res = await post(undefined);
+    assert.ok(/noindex/.test(res.headers.get("x-robots-tag") || ""), "API responses are noindex");
+    ok("cross-site and opaque-origin POSTs get 403; same-origin and no-Origin work; API is noindex");
+  }
+
+  // ---- Unpaid orders: the owner confirm link expires after 30 days ----
+  {
+    const id = "ORD-OLDAAA";
+    const r = parse(await handler({ httpMethod: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "createOrder", orderId: id, phone: "9459755408", items: [{ id: "vanilla", size: "1 lb (500 g)", qty: 1 }], delivery: 0, total: 375 }) }, ENVV));
+    assert.strictEqual(r.ok, true, r.message);
+    const getc = (q) => handler({ httpMethod: "GET", headers: {}, queryStringParameters: q }, ENVV);
+    assert.strictEqual((await getc({ action: "confirm", id, s: sign("confirm", id) })).statusCode, 200, "fresh link works");
+    const o = stored("order:" + id); o.createdAt = Date.now() - 31 * 86400000;
+    sqlite.prepare("UPDATE kv SET v = ? WHERE k = ?").run(JSON.stringify(o), "order:" + id);
+    assert.strictEqual((await getc({ action: "confirm", id, s: sign("confirm", id) })).statusCode, 410, "31-day-old unpaid link is expired (page)");
+    const post = await handler({ httpMethod: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ do: "confirm", id, s: sign("confirm", id) }).toString() }, ENVV);
+    assert.strictEqual(post.statusCode, 410, "expired link cannot confirm payment");
+    assert.strictEqual(stored("order:" + id).status === "paid", false, "order stays unpaid");
+    ok("owner confirm links expire after 30 days for unpaid orders (page and button)");
+  }
+
   console.log(`\nAll ${pass} checks passed.`);
 })().catch((e) => { console.error("FAIL:", e.message); process.exit(1); });

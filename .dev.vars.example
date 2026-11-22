@@ -1,0 +1,7 @@
+# Copy to .dev.vars for local testing with `wrangler pages dev`. Never commit .dev.vars (it is in .gitignore).
+REWARDS_SECRET=replace-with-40-or-more-random-characters
+OWNER_EMAIL=you@example.com
+BREVO_API_KEY=
+BREVO_SENDER_EMAIL=
+NTFY_TOPIC=
+NTFY_TOKEN=

@@ -49,6 +49,7 @@ const JSON_HEADERS = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
   "X-Frame-Options": "DENY",
+  "X-Robots-Tag": "noindex, nofollow",
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
 };
 const PAGE_HEADERS = {
@@ -58,6 +59,7 @@ const PAGE_HEADERS = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
   "X-Frame-Options": "DENY",
+  "X-Robots-Tag": "noindex, nofollow",
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
   // The confirmation page contains only inline presentation styles and a same-origin POST form.
   "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
@@ -398,6 +400,11 @@ ${orderDetails(order)}
 }
 
 // GET: show the order. Changes nothing, so link scanners and previews are safe.
+// A confirm link is a bearer credential. For an order that is still unpaid it stops working after CONFIRM_TTL_DAYS (default 30).
+const linkExpired = (order) => order.status !== "paid" && Number(order.createdAt) > 0 &&
+  Date.now() - Number(order.createdAt) > (Math.max(1, Number(ENV.CONFIRM_TTL_DAYS) || 30)) * 86400000;
+const expiredPage = () => page(410, pageShell("Link expired", "<p>This confirm link has expired. Open the order in your records and confirm it on WhatsApp.</p>"));
+
 async function confirmPage(q) {
   const id = normOrder(q.id);
   const s = String(q.s || "");
@@ -406,6 +413,7 @@ async function confirmPage(q) {
   }
   const order = await (await store()).get("order:" + id);
   if (!order) return page(404, pageShell("Not found", "<p>Order not found.</p>"));
+  if (linkExpired(order)) return expiredPage();
   return page(200, await confirmPageHtml(id, s, order, false));
 }
 
@@ -419,6 +427,7 @@ async function confirmSubmit(idRaw, s) {
   const found = await db.getWithMetadata("order:" + id);
   if (!found) return page(404, pageShell("Not found", "<p>Order not found.</p>"));
 
+  if (linkExpired(found.data)) return expiredPage();
   let order = found.data;
   let justConfirmed = false;
   if (order.status !== "paid") {
@@ -725,6 +734,13 @@ export async function onRequest(context) {
   request.headers.forEach((v, k) => { headers[k.toLowerCase()] = v; });
   let body = "";
   if (request.method === "POST") {
+    const origin = headers["origin"];
+    if (origin) {
+      // A browser always sends Origin on a cross-site POST. Only our own site may call this API.
+      let sameSite = false;
+      try { sameSite = new URL(origin).host === url.host; } catch (e) { /* bad Origin header */ }
+      if (!sameSite) return new Response('{"ok":false,"message":"Forbidden"}', { status: 403, headers: JSON_HEADERS });
+    }
     if (Number(headers["content-length"] || 0) > MAX_BODY) return new Response('{"ok":false,"message":"Request too large"}', { status: 413, headers: JSON_HEADERS });
     const contentType = String(headers["content-type"] || "").toLowerCase();
     if (!contentType.includes("application/json") && !contentType.includes("application/x-www-form-urlencoded")) {

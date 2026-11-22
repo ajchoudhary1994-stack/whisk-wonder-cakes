@@ -6,7 +6,7 @@ Hosted on **Cloudflare Pages** (free). The site is plain files in `site/`. One s
 - `functions/api/rewards.js` is the only server code: orders, owner payment confirmation, feedback and reward codes.
   It runs at `/api/rewards` and keeps data in a Cloudflare D1 database. The `kv` table is created automatically on first use; migration `0002_create_kv_store.sql` is also provided for managed schema setup.
 - `test/` has the automated checks. Run `npm test` (needs Node 22 or newer).
-- `source/` holds the unminified motion/3D scripts. The `build.sh` mentioned in older notes is not in this ZIP, so edit `site/js/` directly. Not needed to deploy.
+- `source/` and `build.sh` rebuild the motion/3D scripts. Not needed to deploy.
 
 Setup steps are in **CLOUDFLARE-DEPLOY.md**.
 
