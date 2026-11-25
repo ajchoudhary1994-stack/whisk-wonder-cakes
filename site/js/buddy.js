@@ -106,7 +106,7 @@ async function main() {
   const size = () => holderSize()
   const holderSize = () => av.offsetWidth || 70
   const bannerH = () => { const b = document.querySelector('.cc-banner'); const r = b && getComputedStyle(b).display !== 'none' ? b.getBoundingClientRect() : null; return r && r.height > 0 && r.top < innerHeight ? innerHeight - r.top : 0 }
-  const bounds = () => ({ minX: 6, maxX: Math.max(6, Math.min(innerWidth - holderSize() - 6, innerWidth * 0.5 - holderSize() / 2)), minY: 72, maxY: Math.max(72, innerHeight - holderSize() - bannerH() - 14) })
+  const bounds = () => ({ minX: innerWidth <= 640 ? 2 : 6, maxX: Math.max(6, Math.min(innerWidth - holderSize() - 6, innerWidth * 0.5 - holderSize() / 2)), minY: 72, maxY: Math.max(72, innerHeight - holderSize() - bannerH() - (innerWidth <= 640 ? 6 : 14)) })
   const home = () => { const b = bounds(); return { x: b.minX, y: b.maxY } }
   // Keep the speech bubble on screen: pick the side with more room, cap its width, and drop it below the avatar near the top.
   const fit = (p) => {
@@ -124,6 +124,7 @@ async function main() {
   const keepOff = (p) => { const s = holderSize(); if (p.x + s > innerWidth - 100 && p.y + s > innerHeight - 180) p.x = Math.max(6, innerWidth - 100 - s); return p }
   function glide(x, y, ms, ease) {
     if (docked) return Promise.resolve()
+    if (innerWidth <= 640) { const h = home(); x = h.x; y = h.y }  // phones: stay low in the bottom-left corner
     const b = bounds(), from = pos
     pos = keepOff({ x: clamp(x, b.minX, b.maxX), y: clamp(y, b.minY, b.maxY) })
     const fromX = tx(from)
@@ -281,7 +282,8 @@ async function main() {
       if (!touring) say(L('tap'), 5000)           // the tap message stays for 5 seconds
     })
   }
-  addEventListener('resize', () => { const b = bounds(); pos = docked ? { x: b.minX, y: b.maxY } : keepOff({ x: clamp(pos.x, b.minX, b.maxX), y: clamp(pos.y, b.minY, b.maxY) }); place(pos) })
+  addEventListener('resize', () => { if (innerWidth <= 640 && !docked) { glide(0, 0, 450); return }  // phones: slide back down to the corner (e.g. when the cookie banner goes away)
+    const b = bounds(); pos = docked ? { x: b.minX, y: b.maxY } : keepOff({ x: clamp(pos.x, b.minX, b.maxX), y: clamp(pos.y, b.minY, b.maxY) }); place(pos) })
   setInterval(() => { const b = bounds(); if (!busy && pos.y > b.maxY + 2) glide(pos.x, b.maxY, 600) }, 800)  // stay above the cookie banner
 
   const watch = (el, fn, opts) => { if (el) new MutationObserver(fn).observe(el, opts || { childList: true, characterData: true, subtree: true }) }

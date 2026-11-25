@@ -421,7 +421,7 @@ const ok = (name) => { pass++; console.log("PASS", name); };
     assert.strictEqual(r.ok, true, r.message);
     const getc = (q) => handler({ httpMethod: "GET", headers: {}, queryStringParameters: q }, ENVV);
     assert.strictEqual((await getc({ action: "confirm", id, s: sign("confirm", id) })).statusCode, 200, "fresh link works");
-    const o = stored("order:" + id); o.createdAt = Date.now() - 31 * 86400000;
+    const o = stored("order:" + id); assert.strictEqual(typeof o.createdAt, "string", "stored createdAt is an ISO string"); o.createdAt = new Date(Date.now() - 31 * 86400000).toISOString();
     sqlite.prepare("UPDATE kv SET v = ? WHERE k = ?").run(JSON.stringify(o), "order:" + id);
     assert.strictEqual((await getc({ action: "confirm", id, s: sign("confirm", id) })).statusCode, 410, "31-day-old unpaid link is expired (page)");
     const post = await handler({ httpMethod: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ do: "confirm", id, s: sign("confirm", id) }).toString() }, ENVV);

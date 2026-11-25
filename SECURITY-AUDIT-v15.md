@@ -31,3 +31,6 @@ The look and content of the site (HTML, CSS, images, videos, copy) are exactly v
 
 ## Accepted risks
 No Cloudflare Turnstile yet (needs a frontend change); carrier-shared IPs can hit per-IP limits; no professional penetration test.
+
+## v15.2 (23 Nov 2026)
+- Fixed: the 30-day owner-confirm-link expiry did not work on real data, because orders store `createdAt` as an ISO string, not milliseconds. It now accepts both. The test now uses the same ISO format as production.
