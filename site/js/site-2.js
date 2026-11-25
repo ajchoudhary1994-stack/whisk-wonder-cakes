@@ -622,8 +622,22 @@
     return L.join('\n');
   }
 
+  var lastOrderText = '';
+  function copyText(t) {
+    function fallback() {
+      try {
+        var ta = document.createElement('textarea'); ta.value = t; ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
+        var ok = document.execCommand('copy'); document.body.removeChild(ta); return ok;
+      } catch (e) { return false; }
+    }
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(t).then(function () { return true; }, function () { return fallback(); });
+    return Promise.resolve(fallback());
+  }
+
   function finish(o, payLine, status) {
     var text = waText(o, payLine), enc = encodeURIComponent(text);
+    lastOrderText = text;
     var isUpi = status === 'UPI PENDING';
     $('doneId').textContent = o.id;
     $('doneWa').href = 'https://wa.me/' + OWNER_WA + '?text=' + enc;
@@ -874,6 +888,9 @@
     $('cartClose').addEventListener('click', closeCart);
     overlay.addEventListener('click', closeCart);
     $('doneClose').addEventListener('click', closeCart);
+    $('doneCopy').addEventListener('click', function () {
+      copyText(lastOrderText).then(function (ok) { toast(ok ? 'Order details copied' : 'Could not copy. Please use Send Order on WhatsApp.'); });
+    });
     $('goCheckout').addEventListener('click', function () { fillSummary(); coErr(''); view('viewCheckout'); });
     $('coBack').addEventListener('click', function () { view('viewCart'); });
     $('coForm').addEventListener('submit', onPlace);

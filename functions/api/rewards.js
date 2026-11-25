@@ -401,8 +401,13 @@ ${orderDetails(order)}
 
 // GET: show the order. Changes nothing, so link scanners and previews are safe.
 // A confirm link is a bearer credential. For an order that is still unpaid it stops working after CONFIRM_TTL_DAYS (default 30).
-const linkExpired = (order) => order.status !== "paid" && Number(order.createdAt) > 0 &&
-  Date.now() - Number(order.createdAt) > (Math.max(1, Number(ENV.CONFIRM_TTL_DAYS) || 30)) * 86400000;
+// createdAt is stored as an ISO date string by now(); older/other data may hold milliseconds, so accept both.
+const createdMs = (order) => (typeof order.createdAt === "number" ? order.createdAt : Date.parse(order.createdAt));
+const linkExpired = (order) => {
+  const t = createdMs(order);
+  return order.status !== "paid" && Number.isFinite(t) && t > 0 &&
+    Date.now() - t > (Math.max(1, Number(ENV.CONFIRM_TTL_DAYS) || 30)) * 86400000;
+};
 const expiredPage = () => page(410, pageShell("Link expired", "<p>This confirm link has expired. Open the order in your records and confirm it on WhatsApp.</p>"));
 
 async function confirmPage(q) {

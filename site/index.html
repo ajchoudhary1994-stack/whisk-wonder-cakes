@@ -29,6 +29,7 @@
 <meta name="twitter:description" content="100% eggless cakes, handcrafted only after your order. Delivered fresh within 6–12 hours in Arla, Palampur.">
 <meta name="twitter:image" content="https://www.whiskandwondercakes.in/og-image.jpg">
 <link rel="canonical" href="https://www.whiskandwondercakes.in/">
+<link rel="preload" as="image" href="assets/video/hero-poster.jpg" fetchpriority="high">
 <meta name="theme-color" content="#4B2E2B">
 <link rel="icon" type="image/webp" href="assets/favicon.webp">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
@@ -181,6 +182,102 @@
 <link rel="stylesheet" href="css/v20.css">
 <link rel="stylesheet" href="css/v26.css">
 <link rel="stylesheet" href="css/buddy.css">
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@type": "FAQPage",
+ "mainEntity": [
+  {
+   "@type": "Question",
+   "name": "Do you keep any cakes ready in advance?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "No. We never keep frozen or ready-made cakes on a shelf. Every cake is baked and decorated only after your order is confirmed, so it reaches you as fresh as possible."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "Are all your cakes really eggless?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "Yes, 100%. Every recipe on our menu — from Black Forest to red velvet — is fully egg-free, using techniques that keep the texture soft and moist."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "How long does delivery take?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "Most orders are delivered within 6–12 hours of confirmation, depending on the design's complexity and your location. For elaborate wedding or tiered cakes, we recommend ordering a day ahead."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "Can I request a custom design or theme?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "Absolutely — share a reference image or describe your idea over WhatsApp, and our team will bring it to life in fondant, buttercream or a semi-naked finish."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "How do I place an order?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "Simply message us on WhatsApp or call us directly with your flavour, size, design idea and delivery address, and we'll confirm the price and timing right away."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "Do you offer home delivery?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "Yes. Home delivery is available within a 10 km radius of our kitchen in Arla. For addresses beyond 10 km, we confirm the delivery charge with you on WhatsApp before we deliver. Not sure if your area is covered? Type it in the “Check if we deliver to you” box on this page, or message us on WhatsApp."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "Do you also sell balloons, candles and other party items?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "Yes. Along with cakes, we provide items for all kinds of events — metallic balloons, pastel balloons, candles, banners, party caps, poppers, confetti and more. You can add them to your cake order and get everything in one delivery."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "Where can I get an eggless cake in Palampur?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "Whisk & Wonder Cakes is a home bakery in Arla, Palampur, near Concrete Plant Arla. Every cake is 100% eggless and baked only after you order. Order on this page or message us on WhatsApp for home delivery or pickup."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "Do you deliver cakes in Palampur and nearby areas?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "Yes. We deliver across Palampur and Arla within 10 km of our kitchen, usually in 6–12 hours. For Baijnath, Kangra or any address beyond 10 km, message us on WhatsApp first so we can confirm delivery and the charge."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "How much does an eggless cake cost in Palampur?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "Cakes are priced per 1 lb (500 g): Pineapple and Vanilla ₹375, Strawberry and Butterscotch ₹425, Black Forest ₹525 and Red Velvet ₹575. Bigger cakes cost proportionally more. Custom designs are confirmed on WhatsApp."
+   }
+  },
+  {
+   "@type": "Question",
+   "name": "What are your working hours, and can I order at night?",
+   "acceptedAnswer": {
+    "@type": "Answer",
+    "text": "You can place an order on this website at any time, day or night. We work from 9:00 AM to 9:00 PM, so orders placed outside these hours are confirmed and baked from 9:00 AM onwards. For early-morning delivery, order the day before."
+   }
+  }
+ ]
+}
+</script>
 </head>
 <body>
 <a href="#home" class="skip-link">Skip to content</a>
@@ -233,7 +330,7 @@
   <!-- HERO -->
   <section class="hero">
     <div class="hero-media">
-      <video class="hero-video" poster="assets/video/hero-poster.jpg" autoplay muted loop playsinline preload="metadata" aria-hidden="true">
+      <video class="hero-video" poster="assets/video/hero-poster.jpg" muted loop playsinline preload="none" aria-hidden="true">
         <source src="assets/video/hero-16x9.mp4" type="video/mp4">
       </video>
     </div>
@@ -286,7 +383,7 @@
   </div>
 
   <section class="signature" id="signature" aria-labelledby="sigTitle">
-    <video class="sig-bg-video" poster="assets/video/signature-poster.jpg" autoplay muted loop playsinline preload="metadata" aria-hidden="true"><source src="assets/video/signature-bg-720x1280.mp4" type="video/mp4"></video><div class="sig-bg-shade" aria-hidden="true"></div>
+    <video class="sig-bg-video" poster="assets/video/signature-poster.jpg" muted loop playsinline preload="none" aria-hidden="true"><source src="assets/video/signature-bg-720x1280.mp4" type="video/mp4"></video><div class="sig-bg-shade" aria-hidden="true"></div>
     <div class="container sig-grid">
       <div class="sig-copy">
         <span class="eyebrow">Signature Collection</span>
@@ -1002,11 +1099,13 @@
       <div>
         <h5>Cakes</h5>
         <ul>
-          <li>Celebration Cakes</li>
-          <li>Anniversary Cakes</li>
-          <li>Wedding Cakes</li>
-          <li>Kids Theme Cakes</li>
-          <li>Party Supplies &amp; Decor</li>
+          <li><a href="/eggless-birthday-cakes-palampur/">Birthday Cakes</a></li>
+          <li><a href="/eggless-anniversary-cakes-palampur/">Anniversary Cakes</a></li>
+          <li><a href="/eggless-wedding-cakes-palampur/">Wedding Cakes</a></li>
+          <li><a href="/kids-theme-cakes-palampur/">Kids Theme Cakes</a></li>
+          <li><a href="/custom-design-cakes-palampur/">Custom Design Cakes</a></li>
+          <li><a href="/party-supplies-palampur/">Party Supplies &amp; Decor</a></li>
+          <li><a href="/eggless-cake-home-delivery-arla/">Home Delivery in Arla</a></li>
         </ul>
       </div>
       <div>
@@ -1025,7 +1124,7 @@
       <span>Freshly Baked • 100% Eggless • Made With Love</span>
     </div>
   </div>
-<nav class="footer-legal" aria-label="Legal"><a href="privacy.html">Privacy policy</a><a href="terms.html">Terms &amp; conditions</a><button type="button" id="cookieSettings">Cookie settings</button></nav>
+<nav class="footer-legal" aria-label="Legal"><a href="/privacy">Privacy policy</a><a href="/terms">Terms &amp; conditions</a><button type="button" id="cookieSettings">Cookie settings</button></nav>
   </footer>
 
 <a class="call-float js-contact" data-contact="call" href="tel:+919459755408" aria-label="Call us">
@@ -1110,7 +1209,8 @@
       </div>
       <a class="btn btn-gold" id="doneWa" href="#" target="_blank" rel="noopener">Send Order on WhatsApp</a>
       <a class="btn btn-dark" id="doneWaAlt" href="#" target="_blank" rel="noopener">Send to Alternate Number</a>
-      <button class="btn btn-dark" id="doneClose" type="button">Done</button>
+      <button class="btn btn-dark" id="doneCopy" type="button">Copy Order Details</button>
+      <button class="done-back" id="doneClose" type="button">Continue Browsing</button>
     </div>
   </div>
 </aside>
@@ -1156,6 +1256,6 @@
   <p class="ping-text" id="pingText"></p>
   <button type="button" class="ping-close" id="pingClose" aria-label="Close sale notifications">&times;</button>
 </div>
-<script type="module" src="js/buddy.js"></script>
+<script src="js/perf.js" defer></script>
 </body>
 </html>

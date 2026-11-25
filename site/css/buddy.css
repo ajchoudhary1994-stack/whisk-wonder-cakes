@@ -20,3 +20,9 @@
 @media (prefers-reduced-motion:reduce){.ww-buddy .bub,.ww-buddy .mo,.ww-buddy .tg{transition:none}}
 @media print{.ww-buddy{display:none}}
 .ww-buddy.popup .av,.ww-buddy.popup .bub{pointer-events:none}.ww-buddy.popup .x{display:none}
+
+@media (max-width:640px){
+  .ww-buddy .bub{position:absolute;left:calc(100% + .35rem);bottom:.25rem;margin:0;width:max-content}
+  .ww-buddy.flip .bub{left:auto;right:calc(100% + .35rem)}
+  .ww-buddy.below .bub{bottom:auto;top:.25rem;margin:0}
+}
